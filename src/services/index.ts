@@ -3,6 +3,7 @@
 export { default as apiService } from './api';
 export { default as configService } from './configService';
 export { default as monitorService } from './monitorService';
+export { default as discoveryService } from './discoveryService';
 
 // Also export default instances for flexibility
 import apiService from './api';

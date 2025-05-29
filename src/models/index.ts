@@ -2,3 +2,4 @@
 export * from './api.models';
 export * from './config.models';
 export * from './monitor.models';
+export * from './discovery.models';

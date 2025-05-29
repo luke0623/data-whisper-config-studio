@@ -13,7 +13,7 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
-import { Database, Settings, Table, Layers, Home, Activity } from 'lucide-react';
+import { Database, Settings, Table, Layers, Home, Activity, Search } from 'lucide-react';
 
 const menuItems = [
   {
@@ -35,6 +35,11 @@ const menuItems = [
     title: "Tables",
     url: "/tables",
     icon: Table,
+  },
+  {
+    title: "Discovery",
+    url: "/discovery",
+    icon: Search,
   },
   {
     title: "Monitor",
