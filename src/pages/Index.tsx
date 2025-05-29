@@ -2,7 +2,8 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Brain, Database, Settings, Zap } from 'lucide-react';
-import ConfigurationForm from '@/components/ConfigurationForm';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import Header from '@/components/Header';
 import FeatureCards from '@/components/FeatureCards';
 
@@ -13,7 +14,7 @@ const Index = () => {
         <Header />
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-          {/* Main Configuration Panel */}
+          {/* Main Dashboard Panel */}
           <div className="lg:col-span-2">
             <Card className="p-8 shadow-xl border-0 bg-white/80 backdrop-blur-sm">
               <div className="flex items-center gap-3 mb-6">
@@ -21,12 +22,60 @@ const Index = () => {
                   <Settings className="h-6 w-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">Data MO Configuration</h2>
-                  <p className="text-gray-600">Configure your data extraction settings with AI assistance</p>
+                  <h2 className="text-2xl font-bold text-gray-900">Quick Actions</h2>
+                  <p className="text-gray-600">Manage your data extraction configurations</p>
                 </div>
               </div>
               
-              <ConfigurationForm />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Link to="/modules">
+                  <Card className="p-6 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <Database className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold">Manage Modules</h3>
+                    </div>
+                    <p className="text-gray-600">Create and edit system modules</p>
+                  </Card>
+                </Link>
+                
+                <Link to="/models">
+                  <Card className="p-6 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Database className="h-6 w-6 text-green-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold">Manage Models</h3>
+                    </div>
+                    <p className="text-gray-600">Configure domain models</p>
+                  </Card>
+                </Link>
+                
+                <Link to="/tables">
+                  <Card className="p-6 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Settings className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold">Manage Tables</h3>
+                    </div>
+                    <p className="text-gray-600">Configure table extraction settings</p>
+                  </Card>
+                </Link>
+                
+                <Link to="/config">
+                  <Card className="p-6 hover:shadow-lg transition-all duration-200 cursor-pointer">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <Zap className="h-6 w-6 text-orange-600" />
+                      </div>
+                      <h3 className="text-lg font-semibold">Quick Configuration</h3>
+                    </div>
+                    <p className="text-gray-600">Rapid setup with AI assistance</p>
+                  </Card>
+                </Link>
+              </div>
             </Card>
           </div>
 
