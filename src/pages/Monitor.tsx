@@ -1,18 +1,59 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Activity, CheckCircle, XCircle, Clock, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Activity, CheckCircle, XCircle, Clock, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
+import { monitorService } from '@/services';
+import { IngestionEvent, MonitoringSummary } from '@/models';
+import { toast } from '@/hooks/use-toast';
 
 const Monitor = () => {
   const [selectedModule, setSelectedModule] = useState('all');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [ingestionEvents, setIngestionEvents] = useState<IngestionEvent[]>([]);
+  const [summary, setSummary] = useState<MonitoringSummary | null>(null);
 
-  // Mock data for ingestion events
-  const ingestionEvents = [
+  // Fetch ingestion events on component mount
+  useEffect(() => {
+    fetchIngestionEvents();
+  }, []);
+
+  // Fetch ingestion events when selected module changes
+  useEffect(() => {
+    if (!loading) {
+      fetchIngestionEvents();
+    }
+  }, [selectedModule]);
+
+  // Fetch ingestion events from API
+  const fetchIngestionEvents = async () => {
+    setLoading(true);
+    try {
+      let response;
+      
+      if (selectedModule === 'all') {
+        response = await monitorService.getIngestionEvents();
+        const summaryResponse = await monitorService.getMonitoringSummary();
+        setSummary(summaryResponse.data);
+      } else {
+        response = await monitorService.getIngestionEventsByModule(selectedModule);
+        const summaryResponse = await monitorService.getModuleMonitoringSummary(selectedModule);
+        setSummary(summaryResponse.data);
+      }
+      
+      setIngestionEvents(response.data);
+    } catch (error: any) {
+      toast({
+        title: "Error Fetching Data",
+        description: error.message || "Failed to fetch ingestion events",
+        variant: "destructive"
+      });
+      // Fallback to mock data for demo purposes
+      const mockEvents = [
     {
       id: 1,
       module: 'Policy Management',
@@ -78,7 +119,12 @@ const Monitor = () => {
       errors: 0,
       warnings: 12
     }
-  ];
+      ];
+      setIngestionEvents(mockEvents as IngestionEvent[]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const modules = ['Policy Management', 'Claims', 'Finance', 'Customer Management', 'Reinsurance'];
 
@@ -118,18 +164,19 @@ const Monitor = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await fetchIngestionEvents();
     setRefreshing(false);
   };
 
-  // Calculate summary statistics
-  const totalEvents = filteredEvents.length;
-  const successfulEvents = filteredEvents.filter(e => e.status === 'success').length;
-  const failedEvents = filteredEvents.filter(e => e.status === 'failed').length;
-  const runningEvents = filteredEvents.filter(e => e.status === 'running').length;
-  const warningEvents = filteredEvents.filter(e => e.status === 'warning').length;
-  const successRate = totalEvents > 0 ? Math.round((successfulEvents / totalEvents) * 100) : 0;
+  // Use summary from API if available, otherwise calculate locally
+  const {
+    totalEvents = filteredEvents.length,
+    successfulEvents = filteredEvents.filter(e => e.status === 'success').length,
+    failedEvents = filteredEvents.filter(e => e.status === 'failed').length,
+    runningEvents = filteredEvents.filter(e => e.status === 'running').length,
+    warningEvents = filteredEvents.filter(e => e.status === 'warning').length,
+    successRate = totalEvents > 0 ? Math.round((successfulEvents / totalEvents) * 100) : 0
+  } = summary || {};
 
   return (
     <div className="p-6 space-y-6">
@@ -141,9 +188,13 @@ const Monitor = () => {
             <p className="text-gray-600">Track data ingestion events across all modules</p>
           </div>
         </div>
-        <Button onClick={handleRefresh} disabled={refreshing}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
+        <Button onClick={handleRefresh} disabled={refreshing || loading}>
+          {refreshing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          {refreshing ? "Refreshing..." : "Refresh"}
         </Button>
       </div>
 

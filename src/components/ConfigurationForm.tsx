@@ -5,20 +5,24 @@ import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Sparkles, Save, Play } from 'lucide-react';
+import { CheckCircle, Sparkles, Save, Play, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ModuleSelector from '@/components/ModuleSelector';
 import ModelSelector from '@/components/ModelSelector';
 import TableSelector from '@/components/TableSelector';
 import ConfigurationPreview from '@/components/ConfigurationPreview';
+import { configService } from '@/services';
+import { ConfigurationData } from '@/models';
 
 const ConfigurationForm = () => {
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [isAiEnabled, setIsAiEnabled] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
 
-  const handleSaveConfiguration = () => {
+  const handleSaveConfiguration = async () => {
     if (!selectedModule || !selectedModel || selectedTables.length === 0) {
       toast({
         title: "Incomplete Configuration",
@@ -27,14 +31,37 @@ const ConfigurationForm = () => {
       });
       return;
     }
-
-    toast({
-      title: "Configuration Saved",
-      description: "Your data MO configuration has been saved successfully.",
-    });
+    
+    setIsSaving(true);
+    
+    try {
+      // Prepare configuration data
+      const configData: ConfigurationData = {
+        module: selectedModule,
+        model: selectedModel,
+        tables: selectedTables,
+        aiEnabled: isAiEnabled
+      };
+      
+      // Call the service to save configuration
+      const response = await configService.saveConfiguration(configData);
+      
+      toast({
+        title: "Configuration Saved",
+        description: "Your data MO configuration has been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error Saving Configuration",
+        description: error.message || "An error occurred while saving the configuration.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleTestConfiguration = () => {
+  const handleTestConfiguration = async () => {
     if (!selectedModule || !selectedModel || selectedTables.length === 0) {
       toast({
         title: "Incomplete Configuration",
@@ -43,11 +70,39 @@ const ConfigurationForm = () => {
       });
       return;
     }
-
-    toast({
-      title: "Test Started",
-      description: "Testing your configuration... This may take a few moments.",
-    });
+    
+    setIsTesting(true);
+    
+    try {
+      // Prepare configuration data
+      const configData: ConfigurationData = {
+        module: selectedModule,
+        model: selectedModel,
+        tables: selectedTables,
+        aiEnabled: isAiEnabled
+      };
+      
+      toast({
+        title: "Test Started",
+        description: "Testing your configuration... This may take a few moments.",
+      });
+      
+      // Call the service to test configuration
+      const response = await configService.testConfiguration(configData);
+      
+      toast({
+        title: "Test Completed",
+        description: "Your configuration test completed successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Test Failed",
+        description: error.message || "An error occurred while testing the configuration.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsTesting(false);
+    }
   };
 
   const isConfigurationComplete = selectedModule && selectedModel && selectedTables.length > 0;
@@ -153,19 +208,27 @@ const ConfigurationForm = () => {
         <Button
           variant="outline"
           onClick={handleTestConfiguration}
-          disabled={!isConfigurationComplete}
+          disabled={!isConfigurationComplete || isTesting || isSaving}
           className="gap-2"
         >
-          <Play className="h-4 w-4" />
-          Test Configuration
+          {isTesting ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Play className="h-4 w-4" />
+          )}
+          {isTesting ? "Testing..." : "Test Configuration"}
         </Button>
         <Button
           onClick={handleSaveConfiguration}
-          disabled={!isConfigurationComplete}
+          disabled={!isConfigurationComplete || isSaving || isTesting}
           className="gap-2"
         >
-          <Save className="h-4 w-4" />
-          Save Configuration
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+          {isSaving ? "Saving..." : "Save Configuration"}
         </Button>
       </div>
     </div>

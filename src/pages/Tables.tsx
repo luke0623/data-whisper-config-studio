@@ -11,7 +11,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Plus, Edit, Trash2, Table } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 
-interface TableConfig {
+// This is a different table configuration than the one in models/config.models.ts
+interface TableDetailConfig {
   config_id: string;
   name: string;
   table_name: string;
@@ -38,7 +39,7 @@ interface TableConfig {
 }
 
 const Tables = () => {
-  const [tables, setTables] = useState<TableConfig[]>([
+  const [tables, setTables] = useState<TableDetailConfig[]>([
     {
       config_id: 'config_001',
       name: 'Policies Table',
@@ -67,8 +68,8 @@ const Tables = () => {
   ]);
   
   const [isEditing, setIsEditing] = useState(false);
-  const [editingTable, setEditingTable] = useState<TableConfig | null>(null);
-  const [formData, setFormData] = useState<Partial<TableConfig>>({});
+  const [editingTable, setEditingTable] = useState<TableDetailConfig | null>(null);
+  const [formData, setFormData] = useState<Partial<TableDetailConfig>>({});
 
   const handleCreate = () => {
     setIsEditing(true);
@@ -98,7 +99,7 @@ const Tables = () => {
     });
   };
 
-  const handleEdit = (table: TableConfig) => {
+  const handleEdit = (table: TableDetailConfig) => {
     setIsEditing(true);
     setEditingTable(table);
     setFormData(table);
@@ -119,7 +120,7 @@ const Tables = () => {
       ...formData,
       created_at: editingTable ? editingTable.created_at : now,
       last_modified_at: now
-    } as TableConfig;
+    } as TableDetailConfig;
 
     if (editingTable) {
       setTables(prev => prev.map(t => t.config_id === editingTable.config_id ? tableData : t));
