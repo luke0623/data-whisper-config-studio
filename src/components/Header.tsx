@@ -1,35 +1,33 @@
 
 import React from 'react';
-import { Database, Sparkles } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Sparkles } from 'lucide-react';
 
-const Header = () => {
+interface HeaderProps {
+  title: string;
+  description?: string;
+  showAIBadge?: boolean;
+}
+
+const Header: React.FC<HeaderProps> = ({ 
+  title, 
+  description, 
+  showAIBadge = false 
+}) => {
   return (
-    <div className="text-center space-y-4">
-      <div className="flex items-center justify-center gap-3 mb-4">
-        <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-          <Database className="h-8 w-8 text-white" />
-        </div>
-        <div className="text-left">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-            Data MO Ingestion
-          </h1>
-          <p className="text-lg text-gray-600">Master Object Configuration Platform</p>
-        </div>
+    <div className="flex flex-col space-y-2 mb-6">
+      <div className="flex items-center gap-3">
+        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+        {showAIBadge && (
+          <Badge variant="outline" className="bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0 flex items-center gap-1 px-3 py-1 h-6">
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Enhanced
+          </Badge>
+        )}
       </div>
-      
-      <div className="flex items-center justify-center gap-2">
-        <Badge variant="outline" className="bg-white/70 backdrop-blur-sm border-blue-200">
-          <Sparkles className="h-3 w-3 mr-1" />
-          AI Enhanced
-        </Badge>
-        <Badge variant="outline" className="bg-white/70 backdrop-blur-sm border-green-200">
-          Business Friendly
-        </Badge>
-        <Badge variant="outline" className="bg-white/70 backdrop-blur-sm border-purple-200">
-          Real-time Configuration
-        </Badge>
-      </div>
+      {description && (
+        <p className="text-muted-foreground">{description}</p>
+      )}
     </div>
   );
 };

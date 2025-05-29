@@ -8,18 +8,9 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2, Layers } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Module } from '@/models/module';
 
-interface Module {
-  module_id: string;
-  module_name: string;
-  priority: number;
-  version: string;
-  tenant_id: string;
-  created_at: string;
-  created_by: string;
-  last_modified_at: string;
-  last_modified_by: string;
-}
+
 
 const Modules = () => {
   const [modules, setModules] = useState<Module[]>([

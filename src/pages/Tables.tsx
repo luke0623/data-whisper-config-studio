@@ -1,390 +1,315 @@
 
-import React, { useState } from 'react';
-import { Card } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Plus, Edit, Trash2, Table } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
+import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
-// This is a different table configuration than the one in models/config.models.ts
+// This interface is specifically for the detailed table configuration shown on this page
+// It's different from the TableConfig in models/config.models.ts
 interface TableDetailConfig {
-  config_id: string;
+  id: string;
   name: string;
-  table_name: string;
-  primary_key: string;
-  object_key: string;
-  sequence_key: string;
-  model_name: string;
-  parent_name: string;
-  label: string;
-  join_keys: string;
-  depend_on: string;
-  audit_column: string;
-  conditions: string;
-  data_source_id: string;
-  is_list: boolean;
-  triggered: boolean;
-  version: string;
-  tenant_id: string;
-  created_at: string;
-  created_by: string;
-  last_modified_at: string;
-  last_modified_by: string;
-  json_columns: string;
+  description: string;
+  schema: string;
+  status: 'active' | 'inactive' | 'pending';
+  lastUpdated: string;
+  recordCount: number;
+  fields: {
+    name: string;
+    type: string;
+    description: string;
+    isPrimaryKey: boolean;
+  }[];
 }
 
 const Tables = () => {
-  const [tables, setTables] = useState<TableDetailConfig[]>([
-    {
-      config_id: 'config_001',
-      name: 'Policies Table',
-      table_name: 'policies',
-      primary_key: 'policy_id',
-      object_key: 'policy_number',
-      sequence_key: 'seq_id',
-      model_name: 'Policy',
-      parent_name: '',
-      label: 'Policy Records',
-      join_keys: 'policy_id',
-      depend_on: '',
-      audit_column: 'audit_info',
-      conditions: 'status = "ACTIVE"',
-      data_source_id: 'ds_001',
-      is_list: true,
-      triggered: false,
-      version: '1.0.0',
-      tenant_id: 'tenant_001',
-      created_at: '2024-01-15T10:00:00Z',
-      created_by: 'admin',
-      last_modified_at: '2024-01-15T10:00:00Z',
-      last_modified_by: 'admin',
-      json_columns: 'policy_details,coverage_info'
+  const [tables, setTables] = useState<TableDetailConfig[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('all');
+
+  useEffect(() => {
+    const fetchTables = async () => {
+      try {
+        setLoading(true);
+        // This would be replaced with an actual API call
+        const mockTables: TableDetailConfig[] = [
+          {
+            id: '1',
+            name: 'Customers',
+            description: 'Customer master data including contact information',
+            schema: 'public',
+            status: 'active',
+            lastUpdated: '2023-06-15',
+            recordCount: 15420,
+            fields: [
+              { name: 'customer_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+              { name: 'name', type: 'varchar(100)', description: 'Customer name', isPrimaryKey: false },
+              { name: 'email', type: 'varchar(255)', description: 'Email address', isPrimaryKey: false },
+              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+            ],
+          },
+          {
+            id: '2',
+            name: 'Orders',
+            description: 'Order transactions with customer references',
+            schema: 'sales',
+            status: 'active',
+            lastUpdated: '2023-06-18',
+            recordCount: 32150,
+            fields: [
+              { name: 'order_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+              { name: 'customer_id', type: 'uuid', description: 'Reference to customer', isPrimaryKey: false },
+              { name: 'amount', type: 'decimal(10,2)', description: 'Order amount', isPrimaryKey: false },
+              { name: 'status', type: 'varchar(20)', description: 'Order status', isPrimaryKey: false },
+              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+            ],
+          },
+          {
+            id: '3',
+            name: 'Products',
+            description: 'Product catalog with pricing information',
+            schema: 'inventory',
+            status: 'inactive',
+            lastUpdated: '2023-05-30',
+            recordCount: 8745,
+            fields: [
+              { name: 'product_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+              { name: 'name', type: 'varchar(100)', description: 'Product name', isPrimaryKey: false },
+              { name: 'price', type: 'decimal(10,2)', description: 'Product price', isPrimaryKey: false },
+              { name: 'category', type: 'varchar(50)', description: 'Product category', isPrimaryKey: false },
+              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+            ],
+          },
+          {
+            id: '4',
+            name: 'Suppliers',
+            description: 'Supplier information and contact details',
+            schema: 'inventory',
+            status: 'pending',
+            lastUpdated: '2023-06-10',
+            recordCount: 320,
+            fields: [
+              { name: 'supplier_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+              { name: 'name', type: 'varchar(100)', description: 'Supplier name', isPrimaryKey: false },
+              { name: 'contact_email', type: 'varchar(255)', description: 'Contact email', isPrimaryKey: false },
+              { name: 'country', type: 'varchar(50)', description: 'Country', isPrimaryKey: false },
+              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+            ],
+          },
+        ];
+
+        setTimeout(() => {
+          setTables(mockTables);
+          setLoading(false);
+        }, 800); // Simulate network delay
+      } catch (error) {
+        console.error('Error fetching tables:', error);
+        setLoading(false);
+      }
+    };
+
+    fetchTables();
+  }, []);
+
+  // Filter tables based on search term and status
+  const filteredTables = tables.filter((table) => {
+    const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         table.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = selectedStatus === 'all' || table.status === selectedStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'success';
+      case 'inactive':
+        return 'secondary';
+      case 'pending':
+        return 'warning';
+      default:
+        return 'default';
     }
-  ]);
-  
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingTable, setEditingTable] = useState<TableDetailConfig | null>(null);
-  const [formData, setFormData] = useState<Partial<TableDetailConfig>>({});
-
-  const handleCreate = () => {
-    setIsEditing(true);
-    setEditingTable(null);
-    setFormData({
-      config_id: '',
-      name: '',
-      table_name: '',
-      primary_key: '',
-      object_key: '',
-      sequence_key: '',
-      model_name: '',
-      parent_name: '',
-      label: '',
-      join_keys: '',
-      depend_on: '',
-      audit_column: '',
-      conditions: '',
-      data_source_id: '',
-      is_list: false,
-      triggered: false,
-      version: '1.0.0',
-      tenant_id: 'tenant_001',
-      created_by: 'current_user',
-      last_modified_by: 'current_user',
-      json_columns: ''
-    });
-  };
-
-  const handleEdit = (table: TableDetailConfig) => {
-    setIsEditing(true);
-    setEditingTable(table);
-    setFormData(table);
-  };
-
-  const handleSave = () => {
-    if (!formData.name || !formData.config_id || !formData.table_name) {
-      toast({
-        title: "Validation Error",
-        description: "Config ID, Name, and Table Name are required.",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const tableData = {
-      ...formData,
-      created_at: editingTable ? editingTable.created_at : now,
-      last_modified_at: now
-    } as TableDetailConfig;
-
-    if (editingTable) {
-      setTables(prev => prev.map(t => t.config_id === editingTable.config_id ? tableData : t));
-      toast({
-        title: "Table Updated",
-        description: "Table configuration has been updated successfully."
-      });
-    } else {
-      setTables(prev => [...prev, tableData]);
-      toast({
-        title: "Table Created",
-        description: "New table configuration has been created successfully."
-      });
-    }
-
-    setIsEditing(false);
-    setEditingTable(null);
-    setFormData({});
-  };
-
-  const handleDelete = (configId: string) => {
-    setTables(prev => prev.filter(t => t.config_id !== configId));
-    toast({
-      title: "Table Deleted",
-      description: "Table configuration has been deleted successfully."
-    });
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Table className="h-8 w-8 text-blue-600" />
+    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+      {/* Header with title and description */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-md">
+            <Database className="h-8 w-8 text-white" />
+          </div>
           <div>
-            <h1 className="text-3xl font-bold">Tables</h1>
-            <p className="text-gray-600">Manage table configurations</p>
+            <h1 className="text-3xl font-bold text-gray-900">Tables</h1>
+            <p className="text-gray-600 mt-1">Manage and configure your data tables</p>
           </div>
         </div>
-        <Button onClick={handleCreate} className="gap-2">
+        <Button className="gap-2 self-start md:self-auto">
           <Plus className="h-4 w-4" />
-          Create Table Config
+          Add New Table
         </Button>
+      </div>
+
+      {/* Info banner */}
+      <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-start gap-3">
+        <Info className="h-5 w-5 text-indigo-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-medium text-indigo-800">Table Management</h3>
+          <p className="text-sm text-indigo-700 mt-1">
+            Tables represent your data sources that can be configured for extraction. 
+            Active tables are currently being used in configurations.
+          </p>
+        </div>
       </div>
 
       <Separator />
 
-      {isEditing && (
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">
-            {editingTable ? 'Edit Table Configuration' : 'Create New Table Configuration'}
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="config_id">Config ID</Label>
-              <Input
-                id="config_id"
-                value={formData.config_id || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, config_id: e.target.value }))}
-                disabled={!!editingTable}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={formData.name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="table_name">Table Name</Label>
-              <Input
-                id="table_name"
-                value={formData.table_name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, table_name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="primary_key">Primary Key</Label>
-              <Input
-                id="primary_key"
-                value={formData.primary_key || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, primary_key: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="object_key">Object Key</Label>
-              <Input
-                id="object_key"
-                value={formData.object_key || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, object_key: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="sequence_key">Sequence Key</Label>
-              <Input
-                id="sequence_key"
-                value={formData.sequence_key || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, sequence_key: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="model_name">Model Name</Label>
-              <Input
-                id="model_name"
-                value={formData.model_name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, model_name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="parent_name">Parent Name</Label>
-              <Input
-                id="parent_name"
-                value={formData.parent_name || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, parent_name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="label">Label</Label>
-              <Input
-                id="label"
-                value={formData.label || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="join_keys">Join Keys</Label>
-              <Input
-                id="join_keys"
-                value={formData.join_keys || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, join_keys: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="depend_on">Depends On</Label>
-              <Input
-                id="depend_on"
-                value={formData.depend_on || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, depend_on: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="audit_column">Audit Column</Label>
-              <Input
-                id="audit_column"
-                value={formData.audit_column || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, audit_column: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="data_source_id">Data Source ID</Label>
-              <Input
-                id="data_source_id"
-                value={formData.data_source_id || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, data_source_id: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="version">Version</Label>
-              <Input
-                id="version"
-                value={formData.version || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, version: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="tenant_id">Tenant ID</Label>
-              <Input
-                id="tenant_id"
-                value={formData.tenant_id || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, tenant_id: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="conditions">Conditions</Label>
-              <Textarea
-                id="conditions"
-                value={formData.conditions || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, conditions: e.target.value }))}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="json_columns">JSON Columns (comma-separated)</Label>
-              <Textarea
-                id="json_columns"
-                value={formData.json_columns || ''}
-                onChange={(e) => setFormData(prev => ({ ...prev, json_columns: e.target.value }))}
-                rows={2}
-              />
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="is_list"
-                checked={formData.is_list || false}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, is_list: checked }))}
-              />
-              <Label htmlFor="is_list">Is List</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="triggered"
-                checked={formData.triggered || false}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, triggered: checked }))}
-              />
-              <Label htmlFor="triggered">Triggered</Label>
-            </div>
+      {/* Filters and actions */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <Input 
+            placeholder="Search tables..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full sm:w-80"
+          />
+          <div className="flex gap-2">
+            <Button 
+              variant={selectedStatus === 'all' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setSelectedStatus('all')}
+            >
+              All
+            </Button>
+            <Button 
+              variant={selectedStatus === 'active' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setSelectedStatus('active')}
+            >
+              Active
+            </Button>
+            <Button 
+              variant={selectedStatus === 'inactive' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setSelectedStatus('inactive')}
+            >
+              Inactive
+            </Button>
+            <Button 
+              variant={selectedStatus === 'pending' ? 'default' : 'outline'} 
+              size="sm" 
+              onClick={() => setSelectedStatus('pending')}
+            >
+              Pending
+            </Button>
           </div>
-          <div className="flex gap-3 mt-6">
-            <Button onClick={handleSave}>Save</Button>
-            <Button variant="outline" onClick={() => setIsEditing(false)}>Cancel</Button>
-          </div>
-        </Card>
+        </div>
+        <div className="flex gap-2 w-full sm:w-auto justify-end">
+          <Button variant="outline" size="sm" className="gap-1">
+            <Download className="h-4 w-4" />
+            Export
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1" onClick={() => window.location.reload()}>
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+        </div>
+      </div>
+
+      {/* Table list */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i} className="border border-gray-200 shadow-sm rounded-xl overflow-hidden">
+              <div className="p-6 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="h-4 bg-gray-200 rounded w-2/3 mb-6"></div>
+                <div className="space-y-3">
+                  <div className="h-3 bg-gray-200 rounded w-full"></div>
+                  <div className="h-3 bg-gray-200 rounded w-full"></div>
+                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {filteredTables.length > 0 ? (
+            filteredTables.map((table) => (
+              <Card key={table.id} className="border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200">
+                <CardHeader className="pb-2">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-xl">{table.name}</CardTitle>
+                      <CardDescription className="mt-1">{table.description}</CardDescription>
+                    </div>
+                    <Badge variant="secondary" className={`capitalize ${table.status === 'active' ? 'bg-green-100 text-green-800' : table.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {table.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div>
+                      <p className="text-gray-500">Schema</p>
+                      <p className="font-medium">{table.schema}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Records</p>
+                      <p className="font-medium">{table.recordCount.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Last Updated</p>
+                      <p className="font-medium">{table.lastUpdated}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Fields</p>
+                      <p className="font-medium">{table.fields.length}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 mt-4">
+                    <Button variant="outline" size="sm">View Details</Button>
+                    <Button variant="default" size="sm">Configure</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-2 bg-gray-50 rounded-lg p-8 text-center">
+              <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+                <Database className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-1">No tables found</h3>
+              <p className="text-gray-500 mb-4">No tables match your current search criteria.</p>
+              <Button onClick={() => { setSearchTerm(''); setSelectedStatus('all'); }}>
+                Clear Filters
+              </Button>
+            </div>
+          )}
+        </div>
       )}
 
-      <div className="grid grid-cols-1 gap-6">
-        {tables.map((table) => (
-          <Card key={table.config_id} className="p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-semibold">{table.name}</h3>
-                <p className="text-sm text-gray-600">Config ID: {table.config_id}</p>
-                <p className="text-sm text-gray-600">Table: {table.table_name}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => handleEdit(table)}>
-                  <Edit className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDelete(table.config_id)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
-              <div>
-                <span className="font-medium">Model:</span> {table.model_name}
-              </div>
-              <div>
-                <span className="font-medium">Primary Key:</span> {table.primary_key}
-              </div>
-              <div>
-                <span className="font-medium">Object Key:</span> {table.object_key}
-              </div>
-              <div>
-                <span className="font-medium">Data Source:</span> {table.data_source_id}
-              </div>
-              <div>
-                <span className="font-medium">Version:</span> {table.version}
-              </div>
-              <div className="flex items-center gap-2">
-                {table.is_list && <Badge variant="secondary">List</Badge>}
-                {table.triggered && <Badge variant="secondary">Triggered</Badge>}
-              </div>
-            </div>
-            {table.conditions && (
-              <div className="mt-3 p-3 bg-gray-50 rounded text-sm">
-                <span className="font-medium">Conditions:</span> {table.conditions}
-              </div>
-            )}
-            <div className="mt-3 text-xs text-gray-500">
-              Last modified: {new Date(table.last_modified_at).toLocaleDateString()} by {table.last_modified_by}
-            </div>
-          </Card>
-        ))}
+      {/* Help section */}
+      <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Need Help?</h3>
+        <p className="text-gray-600 mb-4">
+          Learn how to connect and configure tables for optimal data extraction.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" size="sm" className="gap-2">
+            <HelpCircle className="h-4 w-4" />
+            View Documentation
+          </Button>
+          <Button variant="secondary" size="sm" className="gap-2">
+            Contact Support
+          </Button>
+        </div>
       </div>
     </div>
   );
