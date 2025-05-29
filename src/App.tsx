@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Modules from "./pages/Modules";
 import Models from "./pages/Models";
 import Tables from "./pages/Tables";
+import Monitor from "./pages/Monitor";
 import Config from "./pages/Config";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +35,7 @@ const App = () => (
                   <Route path="/modules" element={<Modules />} />
                   <Route path="/models" element={<Models />} />
                   <Route path="/tables" element={<Tables />} />
+                  <Route path="/monitor" element={<Monitor />} />
                   <Route path="/config" element={<Config />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
