@@ -218,14 +218,15 @@ const Discovery = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center mb-4">
               <TabsList>
+              <TabsTrigger value="table" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Table View
+                </TabsTrigger>
                 <TabsTrigger value="visualization" className="gap-2">
                   <Database className="h-4 w-4" />
                   Visualization
                 </TabsTrigger>
-                <TabsTrigger value="table" className="gap-2">
-                  <FileText className="h-4 w-4" />
-                  Table View
-                </TabsTrigger>
+                
                 <TabsTrigger value="insights" className="gap-2">
                   <Sparkles className="h-4 w-4" />
                   AI Insights
