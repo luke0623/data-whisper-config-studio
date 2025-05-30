@@ -65,12 +65,12 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ entity }) => {
                 <TableBody>
                   {entity.columns.map((column) => (
                     <TableRow key={column.id}>
-                      <TableCell className="font-medium flex items-center gap-1">
+                      <TableCell className="font-medium flex items-center gap-1 truncate">
                         {column.isPrimaryKey && (
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger>
-                                <Key className="h-3.5 w-3.5 text-amber-500" />
+                                <Key className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>Primary Key</p>
@@ -82,7 +82,7 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ entity }) => {
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger>
-                                <KeyRound className="h-3.5 w-3.5 text-blue-500" />
+                                <KeyRound className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p>Foreign Key</p>
@@ -90,15 +90,15 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ entity }) => {
                             </Tooltip>
                           </TooltipProvider>
                         )}
-                        {column.name}
+                        <span className="truncate">{column.name}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-gray-600">
+                        <span className="text-gray-600 truncate block">
                           {formatColumnType(column)}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
+                      <TableCell className="max-w-[200px]">
+                        <div className="flex flex-wrap gap-1 overflow-hidden">
                           {column.isPrimaryKey && (
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs">
                               Primary Key
@@ -121,9 +121,9 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ entity }) => {
                           )}
                         </div>
                         {column.isForeignKey && column.referencedColumn && (
-                          <div className="mt-1 text-xs text-gray-500 flex items-center gap-1">
-                            <Info className="h-3 w-3" />
-                            References {column.referencedColumn.tableName}.{column.referencedColumn.columnName}
+                          <div className="mt-1 text-xs text-gray-500 flex items-center gap-1 truncate">
+                            <Info className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">References {column.referencedColumn.tableName}.{column.referencedColumn.columnName}</span>
                           </div>
                         )}
                       </TableCell>

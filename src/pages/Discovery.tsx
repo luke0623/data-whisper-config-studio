@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReactFlowProvider } from 'reactflow';
-import { Database, Search, Sparkles, Info, RefreshCw, HelpCircle } from 'lucide-react';
+import { Database, Search, Sparkles, Info, RefreshCw, HelpCircle, FileText } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,10 +9,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 import DatabaseFlowChart from '@/components/discovery/DatabaseFlowChart';
 import EntityDetails from '@/components/discovery/EntityDetails';
 import DatabaseInsights from '@/components/discovery/DatabaseInsights';
+import ModuleSelector from '@/components/ModuleSelector';
+import ModelSelector from '@/components/ModelSelector';
 import { discoveryService } from '@/services';
 import { DatabaseEntity, DatabaseInsight } from '@/models/discovery.models';
 
@@ -26,6 +29,8 @@ const Discovery = () => {
   const [selectedEntity, setSelectedEntity] = useState<DatabaseEntity | null>(null);
   const [insights, setInsights] = useState<DatabaseInsight[]>([]);
   const [activeTab, setActiveTab] = useState('visualization');
+  const [selectedModule, setSelectedModule] = useState('');
+  const [selectedModel, setSelectedModel] = useState('');
 
   // Load initial data
   useEffect(() => {
@@ -52,24 +57,27 @@ const Discovery = () => {
     loadData();
   }, []);
 
-  // Filter entities based on search term
+  // Filter entities based on search term, module, and model
   useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredEntities(entities);
-      return;
+    let filtered = entities;
+    if (searchTerm.trim()) {
+      filtered = filtered.filter(entity => 
+        entity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entity.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        entity.columns.some(col => 
+          col.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          col.description?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      );
     }
-    
-    const filtered = entities.filter(entity => 
-      entity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entity.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      entity.columns.some(col => 
-        col.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        col.description?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    );
-    
+    // if (selectedModule) {
+    //   filtered = filtered.filter(entity => entity.module === selectedModule);
+    // }
+    // if (selectedModel) {
+    //   filtered = filtered.filter(entity => entity.model === selectedModel);
+    // }
     setFilteredEntities(filtered);
-  }, [searchTerm, entities]);
+  }, [searchTerm, selectedModule, selectedModel, entities]);
 
   // Handle entity selection
   const handleEntitySelect = useCallback((entity: DatabaseEntity | null) => {
@@ -143,24 +151,44 @@ const Discovery = () => {
       
       <Separator />
       
-      {/* Main content */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Sidebar */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Search and actions */}
-          <Card className="p-4">
-            <div className="space-y-4">
+      {/* Filters and Actions - moved to top */}
+      <Card className="p-6">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Module</label>
+            <ModuleSelector
+              selectedModule={selectedModule}
+              onModuleSelect={setSelectedModule}
+              aiEnabled={true}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Model</label>
+            <ModelSelector
+              selectedModule={selectedModule}
+              selectedModel={selectedModel}
+              onModelSelect={setSelectedModel}
+              aiEnabled={true}
+            />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Search</label>
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  type="text"
-                  placeholder="Search entities..."
-                  className="pl-9"
+                  placeholder="Search entities, columns..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
                 />
               </div>
-              
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Actions</label>
               <Button 
                 className="w-full gap-2" 
                 onClick={runAnalysis}
@@ -179,20 +207,24 @@ const Discovery = () => {
                 )}
               </Button>
             </div>
-          </Card>
-          
-          
+          </div>
         </div>
-        
-        {/* Main content area */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Tabs and visualization/insights content */}
+      </Card>
+      
+      {/* Main content with tabs */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Tab content area */}
+        <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center mb-4">
               <TabsList>
                 <TabsTrigger value="visualization" className="gap-2">
                   <Database className="h-4 w-4" />
                   Visualization
+                </TabsTrigger>
+                <TabsTrigger value="table" className="gap-2">
+                  <FileText className="h-4 w-4" />
+                  Table View
                 </TabsTrigger>
                 <TabsTrigger value="insights" className="gap-2">
                   <Sparkles className="h-4 w-4" />
@@ -235,6 +267,52 @@ const Discovery = () => {
               </div>
             </TabsContent>
             
+            <TabsContent value="table" className="m-0">
+              {loading ? (
+                <Card className="p-6 space-y-4">
+                  <div className="space-y-2">
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                  <Separator />
+                  <div className="space-y-3">
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                    <Skeleton className="h-20 w-full" />
+                  </div>
+                </Card>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Schema</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Columns</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredEntities.map((entity) => (
+                        <TableRow 
+                          key={entity.id}
+                          className="cursor-pointer hover:bg-gray-50"
+                          onClick={() => handleEntitySelect(entity)}
+                        >
+                          <TableCell className="font-medium">{entity.name}</TableCell>
+                          <TableCell>{entity.type}</TableCell>
+                          <TableCell>{entity.schema}</TableCell>
+                          <TableCell>{entity.description}</TableCell>
+                          <TableCell>{entity.columns.length} columns</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </TabsContent>
+            
             <TabsContent value="insights" className="m-0 space-y-4">
               {loading || analyzing ? (
                 <Card className="p-6 space-y-4">
@@ -265,27 +343,26 @@ const Discovery = () => {
               )}
             </TabsContent>
           </Tabs>
-          
-          {/* Entity details moved to bottom */}
-          
-          <div className="h-[300px]">
-            {loading ? (
-              <Card className="h-full p-6 space-y-4">
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-                <Separator />
-                <div className="space-y-3">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                </div>
-              </Card>
-            ) : (
-              <EntityDetails entity={selectedEntity} />
-            )}
-          </div>
+        </div>
+        
+        {/* Entity details sidebar */}
+        <div className="lg:col-span-1">
+          {loading ? (
+            <Card className="h-full p-6 space-y-4">
+              <div className="space-y-2">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+              <Separator />
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </div>
+            </Card>
+          ) : (
+            <EntityDetails entity={selectedEntity} />
+          )}
         </div>
       </div>
       
