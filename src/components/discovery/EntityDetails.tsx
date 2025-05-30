@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { DatabaseEntity, Column } from '@/models/discovery.models';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,24 +34,20 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ entity }) => {
 
   return (
     <Card className="h-full">
-      <CardHeader className="pb-4">
+      <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Database className="h-6 w-6 text-blue-500" />
-            <div>
-              <CardTitle className="text-xl">{entity.name}</CardTitle>
-              <CardDescription className="text-sm text-gray-600">
-                {entity.schema}.{entity.name}
-              </CardDescription>
-            </div>
-          </div>
-          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 capitalize">
-            {entity.type}
-          </Badge>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Database className="h-5 w-5 text-blue-500" />
+            {entity.name}
+          </CardTitle>
+          <Badge variant="outline">{entity.type}</Badge>
         </div>
-        {entity.description && (
-          <p className="text-sm text-gray-600 mt-2">{entity.description}</p>
-        )}
+        <CardDescription>
+          {entity.schema}.{entity.name}
+          {entity.description && (
+            <span className="block mt-1">{entity.description}</span>
+          )}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -131,54 +126,33 @@ const EntityDetails: React.FC<EntityDetailsProps> = ({ entity }) => {
                             <span className="truncate">References {column.referencedColumn.tableName}.{column.referencedColumn.columnName}</span>
                           </div>
                         )}
-                        {column.isForeignKey && (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 text-xs">
-                            Foreign Key
-                          </Badge>
-                        )}
-                        {!column.isNullable && (
-                          <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-xs">
-                            Not Null
-                          </Badge>
-                        )}
-                        {column.defaultValue && (
-                          <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300 text-xs">
-                            Default: {column.defaultValue}
-                          </Badge>
-                        )}
-                      </div>
-                      {column.isForeignKey && column.referencedColumn && (
-                        <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                          <Info className="h-3 w-3" />
-                          References {column.referencedColumn.tableName}.{column.referencedColumn.columnName}
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-        
-        {entity.relationships && entity.relationships.length > 0 && (
-          <div className="mt-6">
-            <h4 className="text-lg font-semibold mb-3">Relationships</h4>
-            <div className="space-y-2">
-              {entity.relationships.map((rel) => (
-                <div key={rel.id} className="p-3 border rounded-lg bg-gray-50">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">{rel.name || 'Relationship'}</span>
-                    <Badge variant="outline" className="capitalize">{rel.type}</Badge>
-                  </div>
-                  <div className="text-xs text-gray-600 mt-1">
-                    {rel.sourceEntityId === entity.id ? 'To' : 'From'}: {rel.sourceEntityId === entity.id ? rel.targetEntityId : rel.sourceEntityId}
-                  </div>
-                </div>
-              ))}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </div>
-        )}
+          
+          {entity.relationships && entity.relationships.length > 0 && (
+            <div>
+              <h4 className="text-sm font-medium mb-2">Relationships</h4>
+              <div className="space-y-2">
+                {entity.relationships.map((rel) => (
+                  <div key={rel.id} className="p-2 border rounded-md bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium text-sm">{rel.name || 'Relationship'}</span>
+                      <Badge variant="outline">{rel.type}</Badge>
+                    </div>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {rel.sourceEntityId === entity.id ? 'To' : 'From'}: {rel.sourceEntityId === entity.id ? rel.targetEntityId : rel.sourceEntityId}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
