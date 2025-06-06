@@ -4,8 +4,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info } from 'lucide-react';
+import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // This interface is specifically for the detailed table configuration shown on this page
 // It's different from the TableConfig in models/config.models.ts
@@ -23,6 +27,20 @@ interface TableDetailConfig {
     description: string;
     isPrimaryKey: boolean;
   }[];
+  // 新增字段
+  table_trigger_id?: string;
+  table_name?: string;
+  data_count?: number;
+  model_name?: string;
+  is_extracted?: boolean;
+  model_trigger_id?: string;
+  event_trigger_id?: string;
+  tenant_id?: string;
+  created_at?: string;
+  created_by?: string;
+  last_modified_at?: string;
+  last_modified_by?: string;
+  module_trigger_id?: string;
 }
 
 const Tables = () => {
@@ -30,6 +48,10 @@ const Tables = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [viewDialogOpen, setViewDialogOpen] = useState<boolean>(false);
+  const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
+  const [selectedTable, setSelectedTable] = useState<TableDetailConfig | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<TableDetailConfig>>({});
 
   useEffect(() => {
     const fetchTables = async () => {
@@ -51,6 +73,19 @@ const Tables = () => {
               { name: 'email', type: 'varchar(255)', description: 'Email address', isPrimaryKey: false },
               { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
             ],
+            table_trigger_id: 'trig_cust_001',
+            table_name: 'customers',
+            data_count: 15420,
+            model_name: 'Customer Model',
+            is_extracted: true,
+            model_trigger_id: 'mod_trig_001',
+            event_trigger_id: 'evt_trig_001',
+            tenant_id: 'tenant_001',
+            created_at: '2023-01-15',
+            created_by: 'admin',
+            last_modified_at: '2023-06-15',
+            last_modified_by: 'system',
+            module_trigger_id: 'mod_001'
           },
           {
             id: '2',
@@ -67,6 +102,19 @@ const Tables = () => {
               { name: 'status', type: 'varchar(20)', description: 'Order status', isPrimaryKey: false },
               { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
             ],
+            table_trigger_id: 'trig_ord_001',
+            table_name: 'orders',
+            data_count: 32150,
+            model_name: 'Order Model',
+            is_extracted: true,
+            model_trigger_id: 'mod_trig_002',
+            event_trigger_id: 'evt_trig_002',
+            tenant_id: 'tenant_001',
+            created_at: '2023-02-10',
+            created_by: 'admin',
+            last_modified_at: '2023-06-18',
+            last_modified_by: 'system',
+            module_trigger_id: 'mod_002'
           },
           {
             id: '3',
@@ -133,6 +181,49 @@ const Tables = () => {
         return 'warning';
       default:
         return 'default';
+    }
+  };
+
+  const handleViewTable = (table: TableDetailConfig) => {
+    setSelectedTable(table);
+    setViewDialogOpen(true);
+  };
+
+  const handleEditTable = (table: TableDetailConfig) => {
+    setSelectedTable(table);
+    setEditFormData({
+      name: table.name,
+      description: table.description,
+      schema: table.schema,
+      status: table.status,
+      table_trigger_id: table.table_trigger_id || '',
+      table_name: table.table_name || '',
+      data_count: table.data_count || 0,
+      model_name: table.model_name || '',
+      is_extracted: table.is_extracted || false,
+      model_trigger_id: table.model_trigger_id || '',
+      event_trigger_id: table.event_trigger_id || '',
+      tenant_id: table.tenant_id || '',
+      created_at: table.created_at || '',
+      created_by: table.created_by || '',
+      last_modified_at: table.last_modified_at || '',
+      last_modified_by: table.last_modified_by || '',
+      module_trigger_id: table.module_trigger_id || ''
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (selectedTable && editFormData) {
+      const updatedTables = tables.map(table => 
+        table.id === selectedTable.id 
+          ? { ...table, ...editFormData, lastUpdated: new Date().toISOString().split('T')[0] }
+          : table
+      );
+      setTables(updatedTables);
+      setEditDialogOpen(false);
+      setSelectedTable(null);
+      setEditFormData({});
     }
   };
 
@@ -274,8 +365,24 @@ const Tables = () => {
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 mt-4">
-                    <Button variant="outline" size="sm">View Details</Button>
-                    <Button variant="default" size="sm">Configure</Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="gap-1"
+                      onClick={() => handleViewTable(table)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      View
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="gap-1"
+                      onClick={() => handleEditTable(table)}
+                    >
+                      <Edit className="h-4 w-4" />
+                      Configure
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -294,6 +401,307 @@ const Tables = () => {
           )}
         </div>
       )}
+
+      {/* View Table Dialog */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              View Table Details - {selectedTable?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTable && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Table Name</Label>
+                  <p className="text-lg font-semibold">{selectedTable.name}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Status</Label>
+                  <Badge variant="secondary" className={`capitalize ${selectedTable.status === 'active' ? 'bg-green-100 text-green-800' : selectedTable.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {selectedTable.status}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Schema</Label>
+                  <p className="font-medium">{selectedTable.schema}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Record Count</Label>
+                  <p className="font-medium">{selectedTable.recordCount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
+                  <p className="font-medium">{selectedTable.lastUpdated}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Total Fields</Label>
+                  <p className="font-medium">{selectedTable.fields.length}</p>
+                </div>
+              </div>
+              
+              <div>
+                <Label className="text-sm font-medium text-gray-500">Description</Label>
+                <p className="mt-1">{selectedTable.description}</p>
+              </div>
+
+              <div>
+                <Label className="text-sm font-medium text-gray-500 mb-3 block">Table Fields</Label>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 grid grid-cols-4 gap-4 p-3 text-sm font-medium text-gray-700">
+                    <div>Field Name</div>
+                    <div>Data Type</div>
+                    <div>Description</div>
+                    <div>Primary Key</div>
+                  </div>
+                  {selectedTable.fields.map((field, index) => (
+                    <div key={index} className="grid grid-cols-4 gap-4 p-3 border-t text-sm">
+                      <div className="font-medium">{field.name}</div>
+                      <div className="text-gray-600">{field.type}</div>
+                      <div className="text-gray-600">{field.description}</div>
+                      <div>
+                        {field.isPrimaryKey && (
+                          <Badge variant="outline" className="text-xs">PK</Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Table Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Configure - {selectedTable?.name}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedTable && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-medium mb-4">Basic Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-name">Table Name</Label>
+                    <Input
+                      id="edit-name"
+                      value={editFormData.name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      placeholder="Enter table name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit-table-name">Table Name (System)</Label>
+                    <Input
+                      id="edit-table-name"
+                      value={editFormData.table_name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, table_name: e.target.value })}
+                      placeholder="Enter system table name"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-schema">Schema</Label>
+                    <Input
+                      id="edit-schema"
+                      value={editFormData.schema || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, schema: e.target.value })}
+                      placeholder="Enter schema name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="edit-status">Status</Label>
+                    <Select
+                      value={editFormData.status || ''}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, status: value as 'active' | 'inactive' | 'pending' })}
+                    >
+                      <SelectTrigger id="edit-status">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <Label htmlFor="edit-description">Description</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={editFormData.description || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                      placeholder="Enter table description"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-medium mb-4">Trigger & Model Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-table-trigger-id">Table Trigger ID</Label>
+                    <Input
+                      id="edit-table-trigger-id"
+                      value={editFormData.table_trigger_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, table_trigger_id: e.target.value })}
+                      placeholder="Enter table trigger ID"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-model-trigger-id">Model Trigger ID</Label>
+                    <Input
+                      id="edit-model-trigger-id"
+                      value={editFormData.model_trigger_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, model_trigger_id: e.target.value })}
+                      placeholder="Enter model trigger ID"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-event-trigger-id">Event Trigger ID</Label>
+                    <Input
+                      id="edit-event-trigger-id"
+                      value={editFormData.event_trigger_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, event_trigger_id: e.target.value })}
+                      placeholder="Enter event trigger ID"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-module-trigger-id">Module Trigger ID</Label>
+                    <Input
+                      id="edit-module-trigger-id"
+                      value={editFormData.module_trigger_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, module_trigger_id: e.target.value })}
+                      placeholder="Enter module trigger ID"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-model-name">Model Name</Label>
+                    <Input
+                      id="edit-model-name"
+                      value={editFormData.model_name || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, model_name: e.target.value })}
+                      placeholder="Enter model name"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-is-extracted" className="block mb-2">Is Extracted</Label>
+                    <Select
+                      value={editFormData.is_extracted ? 'true' : 'false'}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, is_extracted: value === 'true' })}
+                    >
+                      <SelectTrigger id="edit-is-extracted">
+                        <SelectValue placeholder="Select extraction status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-data-count">Data Count</Label>
+                    <Input
+                      id="edit-data-count"
+                      type="number"
+                      value={editFormData.data_count?.toString() || '0'}
+                      onChange={(e) => setEditFormData({ ...editFormData, data_count: parseInt(e.target.value) || 0 })}
+                      placeholder="Enter data count"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-tenant-id">Tenant ID</Label>
+                    <Input
+                      id="edit-tenant-id"
+                      value={editFormData.tenant_id || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, tenant_id: e.target.value })}
+                      placeholder="Enter tenant ID"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div>
+                <h3 className="text-lg font-medium mb-4">Audit Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-created-at">Created At</Label>
+                    <Input
+                      id="edit-created-at"
+                      type="date"
+                      value={editFormData.created_at || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, created_at: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-created-by">Created By</Label>
+                    <Input
+                      id="edit-created-by"
+                      value={editFormData.created_by || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, created_by: e.target.value })}
+                      placeholder="Enter creator name"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-last-modified-at">Last Modified At</Label>
+                    <Input
+                      id="edit-last-modified-at"
+                      type="date"
+                      value={editFormData.last_modified_at || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, last_modified_at: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-last-modified-by">Last Modified By</Label>
+                    <Input
+                      id="edit-last-modified-by"
+                      value={editFormData.last_modified_by || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, last_modified_by: e.target.value })}
+                      placeholder="Enter modifier name"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2 pt-4">
+                <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleSaveEdit}>
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Help section */}
       <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
