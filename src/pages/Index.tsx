@@ -16,10 +16,21 @@ import {
   Eye,
   TrendingUp,
   Users,
-  Server
+  Server,
+  User
 } from 'lucide-react';
 
 const Index = () => {
+  // Mock user data
+  const userData = {
+    name: "John Smith",
+    email: "john.smith@company.com",
+    role: "Data Engineer",
+    department: "Engineering",
+    lastLogin: "2 hours ago",
+    avatar: "JS"
+  };
+
   // Mock recent activity data
   const recentActivity = [
     {
@@ -66,9 +77,54 @@ const Index = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Welcome Header */}
+      {/* User Welcome Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
+            {userData.avatar}
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome back, {userData.name}!</h1>
+            <p className="text-gray-600">{userData.role} • {userData.department}</p>
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-sm text-gray-500">Last login: {userData.lastLogin}</p>
+          <Badge variant="outline" className="mt-1">
+            <User className="h-3 w-3 mr-1" />
+            Active
+          </Badge>
+        </div>
+      </div>
+
+      {/* User Stats Card */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-blue-900">Your Activity Summary</h3>
+              <p className="text-sm text-blue-700">You've been productive today, {userData.name.split(' ')[0]}!</p>
+            </div>
+            <div className="flex gap-6 text-center">
+              <div>
+                <p className="text-lg font-bold text-blue-700">3</p>
+                <p className="text-xs text-blue-600">Modules Created</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-blue-700">12</p>
+                <p className="text-xs text-blue-600">Tasks Completed</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-blue-700">98%</p>
+                <p className="text-xs text-blue-600">Success Rate</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Welcome Message */}
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome to Data MO</h1>
         <p className="text-lg text-gray-600">Configure your data ingestion and monitor system health</p>
       </div>
 
