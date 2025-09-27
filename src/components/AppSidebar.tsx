@@ -61,7 +61,7 @@ export function AppSidebar() {
       <SidebarHeader className="p-4">
         <div className="flex items-center gap-2">
           <Database className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg">Data MO</span>
+          <span className="font-bold text-lg">Watchmen</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -87,7 +87,7 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter className="p-4">
-        <p className="text-xs text-gray-500">Data MO Configuration Platform</p>
+        <p className="text-xs text-gray-500">Watchmen Ingestion Platform</p>
       </SidebarFooter>
     </Sidebar>
   );

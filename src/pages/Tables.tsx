@@ -4,44 +4,14 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X } from 'lucide-react';
+import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-// This interface is specifically for the detailed table configuration shown on this page
-// It's different from the TableConfig in models/config.models.ts
-interface TableDetailConfig {
-  id: string;
-  name: string;
-  description: string;
-  schema: string;
-  status: 'active' | 'inactive' | 'pending';
-  lastUpdated: string;
-  recordCount: number;
-  fields: {
-    name: string;
-    type: string;
-    description: string;
-    isPrimaryKey: boolean;
-  }[];
-  // 新增字段
-  table_trigger_id?: string;
-  table_name?: string;
-  data_count?: number;
-  model_name?: string;
-  is_extracted?: boolean;
-  model_trigger_id?: string;
-  event_trigger_id?: string;
-  tenant_id?: string;
-  created_at?: string;
-  created_by?: string;
-  last_modified_at?: string;
-  last_modified_by?: string;
-  module_trigger_id?: string;
-}
+import { TableDetailConfig, TableStatus } from '@/models/table';
+import { tableService, TableServiceError } from '@/services/tableService';
 
 const Tables = () => {
   const [tables, setTables] = useState<TableDetailConfig[]>([]);
@@ -52,116 +22,139 @@ const Tables = () => {
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
   const [selectedTable, setSelectedTable] = useState<TableDetailConfig | null>(null);
   const [editFormData, setEditFormData] = useState<Partial<TableDetailConfig>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalCount, setTotalCount] = useState<number>(0);
+
+  // 获取表格数据的函数
+  const fetchTables = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await tableService.getAllTables({
+        page: currentPage,
+        limit: 10,
+        search: searchTerm || undefined,
+        status: selectedStatus !== 'all' ? selectedStatus as TableStatus : undefined,
+        sortBy: 'lastUpdated',
+        sortOrder: 'desc'
+      });
+
+      setTables(response.items);
+      setTotalPages(response.totalPages);
+      setTotalCount(response.total);
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+      if (error instanceof TableServiceError) {
+        setError(error.message);
+      } else {
+        setError('Failed to fetch tables. Please try again.');
+      }
+      // 在错误情况下，使用模拟数据作为后备
+      const mockTables: TableDetailConfig[] = [
+        {
+          id: '1',
+          name: 'Customers',
+          description: 'Customer master data including contact information',
+          schema: 'public',
+          status: 'active',
+          lastUpdated: '2023-06-15',
+          recordCount: 15420,
+          fields: [
+            { name: 'customer_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+            { name: 'name', type: 'varchar(100)', description: 'Customer name', isPrimaryKey: false },
+            { name: 'email', type: 'varchar(255)', description: 'Email address', isPrimaryKey: false },
+            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+          ],
+          table_trigger_id: 'trig_cust_001',
+          table_name: 'customers',
+          data_count: 15420,
+          model_name: 'Customer Model',
+          is_extracted: true,
+          model_trigger_id: 'mod_trig_001',
+          event_trigger_id: 'evt_trig_001',
+          tenant_id: 'tenant_001',
+          created_at: '2023-01-15',
+          created_by: 'admin',
+          last_modified_at: '2023-06-15',
+          last_modified_by: 'system',
+          module_trigger_id: 'mod_001'
+        },
+        {
+          id: '2',
+          name: 'Orders',
+          description: 'Order transactions with customer references',
+          schema: 'sales',
+          status: 'active',
+          lastUpdated: '2023-06-18',
+          recordCount: 32150,
+          fields: [
+            { name: 'order_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+            { name: 'customer_id', type: 'uuid', description: 'Reference to customer', isPrimaryKey: false },
+            { name: 'amount', type: 'decimal(10,2)', description: 'Order amount', isPrimaryKey: false },
+            { name: 'status', type: 'varchar(20)', description: 'Order status', isPrimaryKey: false },
+            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+          ],
+          table_trigger_id: 'trig_ord_001',
+          table_name: 'orders',
+          data_count: 32150,
+          model_name: 'Order Model',
+          is_extracted: true,
+          model_trigger_id: 'mod_trig_002',
+          event_trigger_id: 'evt_trig_002',
+          tenant_id: 'tenant_001',
+          created_at: '2023-02-10',
+          created_by: 'admin',
+          last_modified_at: '2023-06-18',
+          last_modified_by: 'system',
+          module_trigger_id: 'mod_002'
+        },
+        {
+          id: '3',
+          name: 'Products',
+          description: 'Product catalog with pricing information',
+          schema: 'inventory',
+          status: 'inactive',
+          lastUpdated: '2023-05-30',
+          recordCount: 8745,
+          fields: [
+            { name: 'product_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+            { name: 'name', type: 'varchar(100)', description: 'Product name', isPrimaryKey: false },
+            { name: 'price', type: 'decimal(10,2)', description: 'Product price', isPrimaryKey: false },
+            { name: 'category', type: 'varchar(50)', description: 'Product category', isPrimaryKey: false },
+            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+          ],
+        },
+        {
+          id: '4',
+          name: 'Suppliers',
+          description: 'Supplier information and contact details',
+          schema: 'inventory',
+          status: 'pending',
+          lastUpdated: '2023-06-10',
+          recordCount: 320,
+          fields: [
+            { name: 'supplier_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
+            { name: 'name', type: 'varchar(100)', description: 'Supplier name', isPrimaryKey: false },
+            { name: 'contact_email', type: 'varchar(255)', description: 'Contact email', isPrimaryKey: false },
+            { name: 'country', type: 'varchar(50)', description: 'Country', isPrimaryKey: false },
+            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
+          ],
+        },
+      ];
+      setTables(mockTables);
+      setTotalCount(mockTables.length);
+      setTotalPages(1);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchTables = async () => {
-      try {
-        setLoading(true);
-        // This would be replaced with an actual API call
-        const mockTables: TableDetailConfig[] = [
-          {
-            id: '1',
-            name: 'Customers',
-            description: 'Customer master data including contact information',
-            schema: 'public',
-            status: 'active',
-            lastUpdated: '2023-06-15',
-            recordCount: 15420,
-            fields: [
-              { name: 'customer_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-              { name: 'name', type: 'varchar(100)', description: 'Customer name', isPrimaryKey: false },
-              { name: 'email', type: 'varchar(255)', description: 'Email address', isPrimaryKey: false },
-              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-            ],
-            table_trigger_id: 'trig_cust_001',
-            table_name: 'customers',
-            data_count: 15420,
-            model_name: 'Customer Model',
-            is_extracted: true,
-            model_trigger_id: 'mod_trig_001',
-            event_trigger_id: 'evt_trig_001',
-            tenant_id: 'tenant_001',
-            created_at: '2023-01-15',
-            created_by: 'admin',
-            last_modified_at: '2023-06-15',
-            last_modified_by: 'system',
-            module_trigger_id: 'mod_001'
-          },
-          {
-            id: '2',
-            name: 'Orders',
-            description: 'Order transactions with customer references',
-            schema: 'sales',
-            status: 'active',
-            lastUpdated: '2023-06-18',
-            recordCount: 32150,
-            fields: [
-              { name: 'order_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-              { name: 'customer_id', type: 'uuid', description: 'Reference to customer', isPrimaryKey: false },
-              { name: 'amount', type: 'decimal(10,2)', description: 'Order amount', isPrimaryKey: false },
-              { name: 'status', type: 'varchar(20)', description: 'Order status', isPrimaryKey: false },
-              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-            ],
-            table_trigger_id: 'trig_ord_001',
-            table_name: 'orders',
-            data_count: 32150,
-            model_name: 'Order Model',
-            is_extracted: true,
-            model_trigger_id: 'mod_trig_002',
-            event_trigger_id: 'evt_trig_002',
-            tenant_id: 'tenant_001',
-            created_at: '2023-02-10',
-            created_by: 'admin',
-            last_modified_at: '2023-06-18',
-            last_modified_by: 'system',
-            module_trigger_id: 'mod_002'
-          },
-          {
-            id: '3',
-            name: 'Products',
-            description: 'Product catalog with pricing information',
-            schema: 'inventory',
-            status: 'inactive',
-            lastUpdated: '2023-05-30',
-            recordCount: 8745,
-            fields: [
-              { name: 'product_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-              { name: 'name', type: 'varchar(100)', description: 'Product name', isPrimaryKey: false },
-              { name: 'price', type: 'decimal(10,2)', description: 'Product price', isPrimaryKey: false },
-              { name: 'category', type: 'varchar(50)', description: 'Product category', isPrimaryKey: false },
-              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-            ],
-          },
-          {
-            id: '4',
-            name: 'Suppliers',
-            description: 'Supplier information and contact details',
-            schema: 'inventory',
-            status: 'pending',
-            lastUpdated: '2023-06-10',
-            recordCount: 320,
-            fields: [
-              { name: 'supplier_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-              { name: 'name', type: 'varchar(100)', description: 'Supplier name', isPrimaryKey: false },
-              { name: 'contact_email', type: 'varchar(255)', description: 'Contact email', isPrimaryKey: false },
-              { name: 'country', type: 'varchar(50)', description: 'Country', isPrimaryKey: false },
-              { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-            ],
-          },
-        ];
-
-        setTimeout(() => {
-          setTables(mockTables);
-          setLoading(false);
-        }, 800); // Simulate network delay
-      } catch (error) {
-        console.error('Error fetching tables:', error);
-        setLoading(false);
-      }
-    };
-
     fetchTables();
-  }, []);
+  }, [currentPage, searchTerm, selectedStatus]);
 
   // Filter tables based on search term and status
   const filteredTables = tables.filter((table) => {
@@ -213,8 +206,35 @@ const Tables = () => {
     setEditDialogOpen(true);
   };
 
-  const handleSaveEdit = () => {
-    if (selectedTable && editFormData) {
+  const handleSaveEdit = async () => {
+    if (!selectedTable || !editFormData) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 调用TableService更新表格
+      const updatedTable = await tableService.updateTable(selectedTable.id, editFormData);
+      
+      // 更新本地状态
+      const updatedTables = tables.map(table => 
+        table.id === selectedTable.id ? updatedTable : table
+      );
+      setTables(updatedTables);
+      
+      // 关闭对话框并重置状态
+      setEditDialogOpen(false);
+      setSelectedTable(null);
+      setEditFormData({});
+    } catch (error) {
+      console.error('Error updating table:', error);
+      if (error instanceof TableServiceError) {
+        setError(`Failed to update table: ${error.message}`);
+      } else {
+        setError('Failed to update table. Please try again.');
+      }
+      
+      // 在错误情况下，仍然进行本地更新作为后备
       const updatedTables = tables.map(table => 
         table.id === selectedTable.id 
           ? { ...table, ...editFormData, lastUpdated: new Date().toISOString().split('T')[0] }
@@ -224,6 +244,42 @@ const Tables = () => {
       setEditDialogOpen(false);
       setSelectedTable(null);
       setEditFormData({});
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteTable = async (tableId: string) => {
+    if (!confirm('Are you sure you want to delete this table? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      // 调用TableService删除表格
+      await tableService.deleteTable(tableId);
+      
+      // 更新本地状态，移除已删除的表格
+      const updatedTables = tables.filter(table => table.id !== tableId);
+      setTables(updatedTables);
+      
+      // 如果当前选中的表格被删除，清除选中状态
+      if (selectedTable?.id === tableId) {
+        setSelectedTable(null);
+        setViewDialogOpen(false);
+        setEditDialogOpen(false);
+      }
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      if (error instanceof TableServiceError) {
+        setError(`Failed to delete table: ${error.message}`);
+      } else {
+        setError('Failed to delete table. Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -257,6 +313,25 @@ const Tables = () => {
           </p>
         </div>
       </div>
+
+      {/* Error banner */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+          <X className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h3 className="font-medium text-red-800">Error</h3>
+            <p className="text-sm text-red-700 mt-1">{error}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setError(null)}
+            className="text-red-600 hover:text-red-800"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       <Separator />
 
@@ -382,6 +457,15 @@ const Tables = () => {
                     >
                       <Edit className="h-4 w-4" />
                       Configure
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm" 
+                      className="gap-1"
+                      onClick={() => handleDeleteTable(table.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
                     </Button>
                   </div>
                 </CardContent>
@@ -523,7 +607,7 @@ const Tables = () => {
                     <Label htmlFor="edit-status">Status</Label>
                     <Select
                       value={editFormData.status || ''}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, status: value as 'active' | 'inactive' | 'pending' })}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, status: value as TableStatus })}
                     >
                       <SelectTrigger id="edit-status">
                         <SelectValue placeholder="Select status" />
@@ -702,6 +786,36 @@ const Tables = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing {((currentPage - 1) * 10) + 1} to {Math.min(currentPage * 10, totalCount)} of {totalCount} tables
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1 || loading}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-600">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages || loading}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Help section */}
       <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">

@@ -68,7 +68,7 @@ const Index = () => {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       {/* Welcome Header */}
       <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome to Data MO</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Welcome to Watchmen</h1>
         <p className="text-lg text-gray-600">Configure your data ingestion and monitor system health</p>
       </div>
 
