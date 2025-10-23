@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TableDetailConfig, TableStatus } from '@/models/table';
+import { TableDetailConfig, TableStatus, CreateTableRequest, TableField } from '@/models/table';
 import { tableService, TableServiceError } from '@/services/tableService';
 
 const Tables = () => {
@@ -26,6 +26,31 @@ const Tables = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
+  
+  // 新增表格相关状态
+  const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false);
+  const [createFormData, setCreateFormData] = useState<CreateTableRequest>({
+    name: '',
+    description: '',
+    schema: '',
+    status: 'pending',
+    recordCount: 0,
+    fields: [],
+    table_trigger_id: '',
+    table_name: '',
+    data_count: 0,
+    model_name: '',
+    is_extracted: false,
+    model_trigger_id: '',
+    event_trigger_id: '',
+    tenant_id: '',
+    created_by: '',
+    last_modified_by: '',
+    module_trigger_id: ''
+  });
+  const [createLoading, setCreateLoading] = useState<boolean>(false);
+  const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // 获取表格数据的函数
   const fetchTables = async () => {
@@ -283,6 +308,158 @@ const Tables = () => {
     }
   };
 
+  // 重置新增表格表单
+  const resetCreateForm = () => {
+    setCreateFormData({
+      name: '',
+      description: '',
+      schema: '',
+      status: 'pending',
+      recordCount: 0,
+      fields: [],
+      table_trigger_id: '',
+      table_name: '',
+      data_count: 0,
+      model_name: '',
+      is_extracted: false,
+      model_trigger_id: '',
+      event_trigger_id: '',
+      tenant_id: '',
+      created_by: '',
+      last_modified_by: '',
+      module_trigger_id: ''
+    });
+    setFormErrors({});
+    setSuccessMessage(null);
+  };
+
+  // 验证表单数据
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+
+    // 验证必填字段
+    if (!createFormData.name.trim()) {
+      errors.name = '表格名称不能为空';
+    } else if (createFormData.name.length < 2) {
+      errors.name = '表格名称至少需要2个字符';
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(createFormData.name)) {
+      errors.name = '表格名称只能包含字母、数字、下划线和连字符';
+    }
+
+    if (!createFormData.schema.trim()) {
+      errors.schema = '数据库模式不能为空';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(createFormData.schema)) {
+      errors.schema = '数据库模式只能包含字母、数字和下划线';
+    }
+
+    // 验证字段
+    if (createFormData.fields.length === 0) {
+      errors.fields = '至少需要添加一个字段';
+    } else {
+      const fieldNames = new Set();
+      let hasPrimaryKey = false;
+      
+      createFormData.fields.forEach((field, index) => {
+        if (!field.name.trim()) {
+          errors[`field_${index}_name`] = '字段名称不能为空';
+        } else if (!/^[a-zA-Z0-9_]+$/.test(field.name)) {
+          errors[`field_${index}_name`] = '字段名称只能包含字母、数字和下划线';
+        } else if (fieldNames.has(field.name)) {
+          errors[`field_${index}_name`] = '字段名称不能重复';
+        } else {
+          fieldNames.add(field.name);
+        }
+
+        if (!field.type) {
+          errors[`field_${index}_type`] = '请选择字段类型';
+        }
+
+        if (field.isPrimaryKey) {
+          if (hasPrimaryKey) {
+            errors[`field_${index}_primary`] = '只能有一个主键字段';
+          }
+          hasPrimaryKey = true;
+        }
+      });
+
+      if (!hasPrimaryKey) {
+        errors.primary_key = '至少需要设置一个主键字段';
+      }
+    }
+
+    // 验证记录数量
+    if (createFormData.recordCount < 0) {
+      errors.recordCount = '记录数量不能为负数';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // 处理新增表格
+  const handleCreateTable = async () => {
+    try {
+      setCreateLoading(true);
+      setError(null);
+
+      // 表单验证
+      if (!validateForm()) {
+        setCreateLoading(false);
+        return;
+      }
+
+      await tableService.createTable(createFormData);
+      
+      // 创建成功后关闭对话框并重新获取数据
+      setCreateDialogOpen(false);
+      resetCreateForm();
+      setSuccessMessage(`表格 "${createFormData.name}" 创建成功！`);
+      await fetchTables();
+      
+      // 3秒后清除成功消息
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      if (err instanceof TableServiceError) {
+        setError(`创建表格失败: ${err.message}`);
+      } else {
+        setError('创建表格时发生未知错误');
+      }
+      console.error('创建表格失败:', err);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  // 添加字段
+  const addField = () => {
+    const newField: TableField = {
+      name: '',
+      type: 'string',
+      isPrimaryKey: false,
+      description: ''
+    };
+    setCreateFormData(prev => ({
+      ...prev,
+      fields: [...prev.fields, newField]
+    }));
+  };
+
+  // 删除字段
+  const removeField = (index: number) => {
+    setCreateFormData(prev => ({
+      ...prev,
+      fields: prev.fields.filter((_, i) => i !== index)
+    }));
+  };
+
+  // 更新字段
+  const updateField = (index: number, field: TableField) => {
+    setCreateFormData(prev => ({
+      ...prev,
+      fields: prev.fields.map((f, i) => i === index ? field : f)
+    }));
+  };
+
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       {/* Header with title and description */}
@@ -296,7 +473,10 @@ const Tables = () => {
             <p className="text-gray-600 mt-1">Manage and configure your data tables</p>
           </div>
         </div>
-        <Button className="gap-2 self-start md:self-auto">
+        <Button 
+          className="gap-2 self-start md:self-auto"
+          onClick={() => setCreateDialogOpen(true)}
+        >
           <Plus className="h-4 w-4" />
           Add New Table
         </Button>
@@ -327,6 +507,29 @@ const Tables = () => {
             size="sm" 
             onClick={() => setError(null)}
             className="text-red-600 hover:text-red-800"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      {/* Success banner */}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+          <div className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <div className="flex-1">
+            <h3 className="font-medium text-green-800">Success</h3>
+            <p className="text-sm text-green-700 mt-1">{successMessage}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setSuccessMessage(null)}
+            className="text-green-600 hover:text-green-800"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -816,6 +1019,251 @@ const Tables = () => {
           </div>
         </div>
       )}
+
+      {/* Create Table Dialog */}
+      <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create New Table</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Basic Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="table-name">Table Name *</Label>
+                  <Input
+                    id="table-name"
+                    value={createFormData.name}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Enter table name"
+                    className={formErrors.name ? "border-red-500" : ""}
+                  />
+                  {formErrors.name && (
+                    <p className="text-sm text-red-600">{formErrors.name}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="table-schema">Schema *</Label>
+                  <Input
+                    id="table-schema"
+                    value={createFormData.schema}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, schema: e.target.value }))}
+                    placeholder="Enter schema name"
+                    className={formErrors.schema ? "border-red-500" : ""}
+                  />
+                  {formErrors.schema && (
+                    <p className="text-sm text-red-600">{formErrors.schema}</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="table-description">Description</Label>
+                <Textarea
+                  id="table-description"
+                  value={createFormData.description}
+                  onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Enter table description"
+                  rows={3}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="table-status">Status</Label>
+                  <Select 
+                    value={createFormData.status} 
+                    onValueChange={(value: TableStatus) => setCreateFormData(prev => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="record-count">Record Count</Label>
+                  <Input
+                    id="record-count"
+                    type="number"
+                    value={createFormData.recordCount}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, recordCount: parseInt(e.target.value) || 0 }))}
+                    placeholder="0"
+                    className={formErrors.recordCount ? "border-red-500" : ""}
+                  />
+                  {formErrors.recordCount && (
+                    <p className="text-sm text-red-600">{formErrors.recordCount}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Fields Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Table Fields</h3>
+                <Button type="button" variant="outline" size="sm" onClick={addField}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Field
+                </Button>
+              </div>
+              {formErrors.fields && (
+                <p className="text-sm text-red-600">{formErrors.fields}</p>
+              )}
+              {formErrors.primary_key && (
+                <p className="text-sm text-red-600">{formErrors.primary_key}</p>
+              )}
+              {createFormData.fields.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No fields added yet. Click "Add Field" to get started.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {createFormData.fields.map((field, index) => (
+                    <div key={index} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Field {index + 1}</h4>
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => removeField(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div className="space-y-2">
+                          <Label>Field Name</Label>
+                          <Input
+                            value={field.name}
+                            onChange={(e) => updateField(index, { ...field, name: e.target.value })}
+                            placeholder="Field name"
+                            className={formErrors[`field_${index}_name`] ? "border-red-500" : ""}
+                          />
+                          {formErrors[`field_${index}_name`] && (
+                            <p className="text-sm text-red-600">{formErrors[`field_${index}_name`]}</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Type</Label>
+                          <Select 
+                            value={field.type} 
+                            onValueChange={(value) => updateField(index, { ...field, type: value })}
+                          >
+                            <SelectTrigger className={formErrors[`field_${index}_type`] ? "border-red-500" : ""}>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="string">String</SelectItem>
+                              <SelectItem value="number">Number</SelectItem>
+                              <SelectItem value="boolean">Boolean</SelectItem>
+                              <SelectItem value="date">Date</SelectItem>
+                              <SelectItem value="datetime">DateTime</SelectItem>
+                              <SelectItem value="text">Text</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {formErrors[`field_${index}_type`] && (
+                            <p className="text-sm text-red-600">{formErrors[`field_${index}_type`]}</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Primary Key</Label>
+                          <Select 
+                            value={field.isPrimaryKey ? "true" : "false"} 
+                            onValueChange={(value) => updateField(index, { ...field, isPrimaryKey: value === "true" })}
+                          >
+                            <SelectTrigger className={formErrors[`field_${index}_primary`] ? "border-red-500" : ""}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="false">No</SelectItem>
+                              <SelectItem value="true">Yes</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {formErrors[`field_${index}_primary`] && (
+                            <p className="text-sm text-red-600">{formErrors[`field_${index}_primary`]}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Input
+                          value={field.description}
+                          onChange={(e) => updateField(index, { ...field, description: e.target.value })}
+                          placeholder="Field description"
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Advanced Configuration */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Advanced Configuration</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="tenant-id">Tenant ID</Label>
+                  <Input
+                    id="tenant-id"
+                    value={createFormData.tenant_id}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, tenant_id: e.target.value }))}
+                    placeholder="Enter tenant ID"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="module-trigger-id">Module Trigger ID</Label>
+                  <Input
+                    id="module-trigger-id"
+                    value={createFormData.module_trigger_id}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, module_trigger_id: e.target.value }))}
+                    placeholder="Enter module trigger ID"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => {
+                  setCreateDialogOpen(false);
+                  resetCreateForm();
+                }}
+                disabled={createLoading}
+              >
+                Cancel
+              </Button>
+              <Button 
+                type="button" 
+                onClick={handleCreateTable}
+                disabled={createLoading}
+              >
+                {createLoading ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Table
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Help section */}
       <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
