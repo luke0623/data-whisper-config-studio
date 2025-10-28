@@ -3,7 +3,9 @@ import { Routes, Route } from 'react-router-dom';
 import { Toaster } from '@/components/ui/toaster';
 import { ThemeProvider } from '@/components/theme-provider';
 
+import AuthGuard from '@/components/AuthGuard';
 import Layout from '@/components/Layout';
+import Login from '@/pages/Login';
 import Index from '@/pages/Index';
 import Modules from '@/pages/Modules';
 import Models from '@/pages/Models';
@@ -18,7 +20,15 @@ function App() {
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <Toaster />
       <Routes>
-        <Route path="/" element={<Layout />}>
+        {/* 登录页面 - 不需要认证保护 */}
+        <Route path="/login" element={<Login />} />
+        
+        {/* 受保护的路由 - 需要登录才能访问 */}
+        <Route path="/" element={
+          <AuthGuard>
+            <Layout />
+          </AuthGuard>
+        }>
           <Route index element={<Index />} />
           <Route path="modules" element={<Modules />} />
           <Route path="models" element={<Models />} />

@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import { useAuth } from '@/context/AuthContext';
 import { 
   Database, 
   Settings, 
@@ -17,19 +18,29 @@ import {
   TrendingUp,
   Users,
   Server,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
 
 const Index = () => {
-  // Mock user data
-  const userData = {
-    name: "John Smith",
-    email: "john.smith@company.com",
-    role: "Data Engineer",
-    department: "Engineering",
-    lastLogin: "2 hours ago",
-    avatar: "JS"
+  const { user, logout } = useAuth();
+  
+  // 生成用户头像字母
+  const getUserAvatar = (name: string) => {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+  
+  // 如果用户未登录，显示加载状态
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Mock recent activity data
   const recentActivity = [
@@ -77,22 +88,42 @@ const Index = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      {/* 右上角用户信息 */}
+      <div className="flex justify-end mb-4">
+        <div className="flex items-center gap-3 bg-white rounded-lg shadow-sm border p-3">
+          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+            {getUserAvatar(user.name)}
+          </div>
+          <div className="text-sm">
+            <p className="font-medium text-gray-900">{user.name}</p>
+            <p className="text-gray-500">{user.email || user.role}</p>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={logout}
+            className="text-gray-500 hover:text-red-600"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+
       {/* User Welcome Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-            {userData.avatar}
+            {getUserAvatar(user.name)}
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back, {userData.name}!</h1>
-            <p className="text-gray-600">{userData.role} • {userData.department}</p>
+            <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user.name}!</h1>
+            <p className="text-gray-600">{user.role} • {user.isActive ? 'Active' : 'Inactive'}</p>
           </div>
         </div>
         <div className="text-right">
-          <p className="text-sm text-gray-500">Last login: {userData.lastLogin}</p>
           <Badge variant="outline" className="mt-1">
             <User className="h-3 w-3 mr-1" />
-            Active
+            {user.isActive ? 'Active' : 'Inactive'}
           </Badge>
         </div>
       </div>
@@ -103,7 +134,7 @@ const Index = () => {
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold text-blue-900">Your Activity Summary</h3>
-              <p className="text-sm text-blue-700">You've been productive today, {userData.name.split(' ')[0]}!</p>
+              <p className="text-sm text-blue-700">You've been productive today, {user.name.split(' ')[0]}!</p>
             </div>
             <div className="flex gap-6 text-center">
               <div>
