@@ -202,7 +202,7 @@ const Modules: React.FC = () => {
             </DialogTrigger>
             <DialogContent className="max-w-none max-h-none w-screen h-screen p-0 m-0 border-0">
               <DialogHeader className="p-6 pb-2">
-                <DialogTitle>Flow </DialogTitle>
+                <DialogTitle>Flow Diagram </DialogTitle>
               </DialogHeader>
               <div className="flex-1 h-[calc(100vh-80px)] p-6 pt-2">
                 <ExecutionFlowDiagram 
@@ -321,9 +321,9 @@ const Modules: React.FC = () => {
                 <Badge variant="outline">Priority: {module.priority}</Badge>
                 <Badge variant="outline">v{module.version}</Badge>
               </div>
-              <p className="text-sm text-gray-600">Tenant: {module.tenantId}</p>
+              {/* <p className="text-sm text-gray-600">Tenant: {module.tenantId}</p> */}
               <p className="text-sm text-gray-600">
-                Last modified: {new Date(module.lastModifiedAt).toLocaleDateString()} by {module.lastModifiedBy}
+                Last modified: {new Date(module.lastModifiedAt).toLocaleDateString()}
               </p>
             </div>
           </Card>

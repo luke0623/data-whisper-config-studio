@@ -363,11 +363,11 @@ const Models = () => {
                 <Badge variant="outline">v{model.version}</Badge>
                 {model.isParalleled && <Badge variant="secondary">Paralleled</Badge>}
               </div>
-              <p className="text-sm text-gray-600">Module: {model.moduleId}</p>
+              {/* <p className="text-sm text-gray-600">Module: {model.moduleId}</p> */}
               <p className="text-sm text-gray-600">Topic: {model.rawTopicCode}</p>
               {model.dependOn && <p className="text-sm text-gray-600">Depends on: {model.dependOn}</p>}
               <p className="text-sm text-gray-600">
-                Last modified: {new Date(model.lastModifiedAt).toLocaleDateString()} by {model.lastModifiedBy}
+                Last modified: {new Date(model.lastModifiedAt).toLocaleDateString()}
               </p>
             </div>
           </Card>

@@ -300,7 +300,7 @@ const calculateHorizontalLayout = (
 };
 
 function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
-  console.log('=== EXECUTION FLOW DIAGRAM COMPONENT MOUNTED ===');
+  // console.log('=== EXECUTION FLOW DIAGRAM COMPONENT MOUNTED ===');
 
   const {
     autoFetch = true,
