@@ -134,6 +134,8 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
             id: `edge-${modelNode.id}-${relatedModule.id}`,
             source: modelNode.id,
             target: relatedModule.id,
+            sourceHandle: 'model-output',
+            targetHandle: 'module-input',
             type: 'smoothstep',
             animated: true,
             style: { stroke: '#10b981', strokeWidth: 2 },
@@ -167,6 +169,8 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
             id: `edge-${dependentModel.id}-${modelNode.id}`,
             source: dependentModel.id,
             target: modelNode.id,
+            sourceHandle: 'model-output',
+            targetHandle: 'model-input',
             type: 'smoothstep',
             animated: false,
             style: { stroke: '#f59e0b', strokeWidth: 2, strokeDasharray: '5,5' },
@@ -294,6 +298,8 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
                   id: `module-edge-${sourceModuleId}-${targetModuleId}`,
                   source: sourceModule.id,
                   target: targetModule.id,
+                  sourceHandle: 'module-output',
+                  targetHandle: 'module-input',
                   type: 'smoothstep',
                   animated: true,
                   style: { stroke: '#3b82f6', strokeWidth: 3 },
@@ -308,7 +314,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
                     level: 0,
                     sourceType: 'module',
                     targetType: 'module'
-                  },
+                  }
                 });
               }
             }

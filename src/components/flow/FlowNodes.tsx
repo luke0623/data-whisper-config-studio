@@ -1,6 +1,6 @@
 import React from 'react';
 import { Layers, GitBranch, Database, ChevronDown, ChevronRight } from 'lucide-react';
-import { NodeProps } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow';
 
 // Base node data interface
 export interface BaseNodeData {
@@ -73,6 +73,14 @@ const ModuleNodeComponent: React.FC<NodeProps<ModuleNodeData>> = ({ data, select
   
   return (
     <div className={getNodeStyles('module', selected, data.level, isAnimating)}>
+      {/* Input handle for incoming edges */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="module-input"
+        style={{ background: '#3b82f6', width: 8, height: 8 }}
+      />
+      
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <Layers className="h-5 w-5 mr-2 text-blue-600 transition-transform duration-200" />
@@ -102,6 +110,14 @@ const ModuleNodeComponent: React.FC<NodeProps<ModuleNodeData>> = ({ data, select
           </div>
         )}
       </div>
+      
+      {/* Output handle for outgoing edges */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="module-output"
+        style={{ background: '#3b82f6', width: 8, height: 8 }}
+      />
     </div>
   );
 };
@@ -114,6 +130,14 @@ const ModelNodeComponent: React.FC<NodeProps<ModelNodeData>> = ({ data, selected
   
   return (
     <div className={getNodeStyles('model', selected, data.level, isAnimating)}>
+      {/* Input handle for incoming edges */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="model-input"
+        style={{ background: '#10b981', width: 8, height: 8 }}
+      />
+      
       <div className="flex items-center justify-between">
         <div className="flex items-center">
           <GitBranch className="h-5 w-5 mr-2 text-green-600 transition-transform duration-200" />
@@ -148,6 +172,14 @@ const ModelNodeComponent: React.FC<NodeProps<ModelNodeData>> = ({ data, selected
           </div>
         )}
       </div>
+      
+      {/* Output handle for outgoing edges */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="model-output"
+        style={{ background: '#10b981', width: 8, height: 8 }}
+      />
     </div>
   );
 };
@@ -156,6 +188,14 @@ const ModelNodeComponent: React.FC<NodeProps<ModelNodeData>> = ({ data, selected
 const TableNodeComponent: React.FC<NodeProps<TableNodeData>> = ({ data, selected }) => {
   return (
     <div className={getNodeStyles('table', selected, data.level)}>
+      {/* Input handle for incoming edges */}
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="table-input"
+        style={{ background: '#9333ea', width: 8, height: 8 }}
+      />
+      
       <div className="flex items-center">
         <Database className="h-5 w-5 mr-2 text-purple-600" />
         <div>
@@ -168,6 +208,14 @@ const TableNodeComponent: React.FC<NodeProps<TableNodeData>> = ({ data, selected
           </div>
         </div>
       </div>
+      
+      {/* Output handle for outgoing edges */}
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="table-output"
+        style={{ background: '#9333ea', width: 8, height: 8 }}
+      />
     </div>
   );
 };

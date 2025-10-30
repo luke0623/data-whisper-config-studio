@@ -117,9 +117,9 @@ interface FlowStatistics {
  */
 const HORIZONTAL_LAYOUT: HorizontalLayoutConfig = {
   // Horizontal spacing between module nodes (increased to avoid overlap)
-  moduleSpacing: 400,
+  moduleSpacing: 600,
   // Vertical spacing between model nodes (increased for better readability)
-  modelVerticalSpacing: 140,
+  modelVerticalSpacing: 150,
   // Horizontal offset from module to model (increased for clear separation)
   moduleToModelOffset: 300,
   // Starting position (adjusted to ensure complete display)
@@ -235,32 +235,18 @@ const calculateHorizontalLayout = (
         
         layoutNodes.push(positionedModel);
         
-        // Add connection edge from module to model
+        // Add connection edge from module to model (real data)
         layoutEdges.push({
           id: `edge-${moduleNode.id}-${modelNode.id}`,
           source: moduleNode.id,
           target: modelNode.id,
-          type: 'default', // Use only default type
-          animated: true,
-          style: { 
-            stroke: '#ff0000', // Red for high visibility
-            strokeWidth: 5, // Very thick for testing
-            strokeDasharray: '0', // Solid line
-          },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: '#ff0000',
-          },
-          label: 'CONTAINS',
-          labelStyle: { 
-            fontSize: 12, 
-            fill: '#ff0000',
-            fontWeight: 'bold',
-          },
-          data: { 
-            type: 'module-model',
-            level: 1,
-          },
+          sourceHandle: 'module-output',
+          targetHandle: 'model-input',
+          type: 'smoothstep',
+          animated: false,
+          style: { stroke: '#94a3b8', strokeWidth: 2 },
+          markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
+          data: { type: 'module-model', level: 1 },
         });
       });
     }
@@ -289,32 +275,18 @@ const calculateHorizontalLayout = (
               if (!processedPairs.has(pairKey)) {
                 processedPairs.add(pairKey);
                 
-                // Add inter-module dependency edge
+                // Add inter-module dependency edge (derived from real model dependencies)
                 layoutEdges.push({
-                  id: `module-dep-${sourceModule.id}-${targetModule.id}`,
+                  id: `module-edge-${sourceModule.id}-${targetModule.id}`,
                   source: targetModule.id,
                   target: sourceModule.id,
-                  type: 'default', // Use only default type
+                  sourceHandle: 'module-output',
+                  targetHandle: 'module-input',
+                  type: 'smoothstep',
                   animated: false,
-                  style: { 
-                    stroke: '#ff00ff', // Magenta for high visibility
-                    strokeWidth: 6, // Very thick for testing
-                    strokeDasharray: '10,5',
-                  },
-                  markerEnd: {
-                    type: MarkerType.ArrowClosed,
-                    color: '#ff00ff',
-                  },
-                  label: 'DEPENDS ON',
-                  labelStyle: { 
-                    fontSize: 14, 
-                    fill: '#ff00ff', 
-                    fontWeight: 'bold',
-                  },
-                  data: { 
-                    type: 'module-dependency',
-                    level: 0,
-                  },
+                  style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6,4' },
+                  markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+                  data: { type: 'module-dependency', level: 0 },
                 });
               }
             }
@@ -327,17 +299,25 @@ const calculateHorizontalLayout = (
   return { nodes: layoutNodes, edges: layoutEdges };
 };
 
-export default function ExecutionFlowDiagram() {
+function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
   console.log('=== EXECUTION FLOW DIAGRAM COMPONENT MOUNTED ===');
-  
-  const { modules, models, isLoading, error, getModelsByModule } = useFlowData();
 
-  console.log('[ExecutionFlowDiagram] Data from useFlowData:', {
-    isLoading,
-    error,
-    moduleNodesCount: getModuleNodes().length,
-    hasGetModelsByModule: typeof getModelsByModule === 'function'
-  });
+  const {
+    autoFetch = true,
+    onNodeClick,
+    onConnect,
+    height = 600,
+    width = '100%',
+    showControls = true,
+    showMiniMap = true,
+    showBackground = true,
+    showRefreshButton = true,
+    className = '',
+  } = props;
+
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
+  const { toast } = useToast();
+  const { isLoading, error, refetch, clearCache, getModuleNodes, getModelsByModule } = useFlowData(autoFetch);
 
   // Component state management
   const [state, setState] = useState<DiagramState>({
@@ -345,19 +325,29 @@ export default function ExecutionFlowDiagram() {
     animatingNodes: new Set(),
   });
 
+  // ReactFlow state management
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
   // Calculate visible nodes and edges based on expansion state
   const visibleContent = useMemo(() => {
     console.log('=== CALCULATING VISIBLE CONTENT ===');
-    console.log('Expanded modules:', expandedModules);
-    console.log('Available modules:', modules?.length || 0);
-    console.log('Available models:', models?.length || 0);
-    
-    const result = calculateHorizontalLayout(modules, models, expandedModules);
-    
+    console.log('Expanded modules:', state.expandedModules);
+
+    const moduleNodes = getModuleNodes();
+    console.log('Available module nodes:', moduleNodes.length);
+
+    const result = calculateHorizontalLayout(
+      moduleNodes,
+      state.expandedModules,
+      state.animatingNodes,
+      getModelsByModule
+    );
+
     console.log('=== LAYOUT RESULT ===');
     console.log('Nodes created:', result.nodes.length);
     console.log('Edges created:', result.edges.length);
-    
+
     result.nodes.forEach((node, index) => {
       console.log(`Node ${index + 1}:`, {
         id: node.id,
@@ -366,7 +356,7 @@ export default function ExecutionFlowDiagram() {
         data: node.data,
       });
     });
-    
+
     result.edges.forEach((edge, index) => {
       console.log(`Edge ${index + 1}:`, {
         id: edge.id,
@@ -378,23 +368,19 @@ export default function ExecutionFlowDiagram() {
         animated: edge.animated,
       });
     });
-    
-    return result;
-  }, [modules, models, expandedModules]);
 
-  // ReactFlow state management
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+    return result;
+  }, [getModuleNodes, getModelsByModule, state.expandedModules, state.animatingNodes]);
 
   // Update ReactFlow nodes and edges
   useEffect(() => {
-    console.log('=== UPDATING REACTFLOW STATE ===');
-    console.log('Current nodes count:', visibleContent.nodes.length);
-    console.log('Current edges count:', visibleContent.edges.length);
+    // console.log('=== UPDATING REACTFLOW STATE ===');
+    // console.log('Current nodes count:', visibleContent.nodes.length);
+    // console.log('Current edges count:', visibleContent.edges.length);
     
-    if (visibleContent.edges.length > 0) {
-      console.log('Sample edges being set:', visibleContent.edges.slice(0, 3));
-    }
+    // if (visibleContent.edges.length > 0) {
+    console.log('Sample edges being set:', visibleContent.edges.slice(0, 3));
+    
     
     setNodes(visibleContent.nodes);
     setEdges(visibleContent.edges);
@@ -519,6 +505,22 @@ export default function ExecutionFlowDiagram() {
     };
   }, [nodes, edges, state.expandedModules]);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('=== COMPONENT RENDERED ===');
+    console.log('Nodes:', nodes.length);
+    console.log('Edges:', edges.length);
+    console.log('First few edges:', edges.slice(0, 3));
+  }, [nodes, edges]);
+
+  console.log('[ExecutionFlowDiagram] Data from useFlowData:', {
+    isLoading,
+    error,
+    moduleNodesCount: getModuleNodes().length,
+    hasGetModelsByModule: typeof getModelsByModule === 'function'
+  });
+
+  // NOW SAFE TO HAVE EARLY RETURNS AFTER ALL HOOKS
   // Loading state
   if (isLoading) {
     return (
@@ -558,14 +560,6 @@ export default function ExecutionFlowDiagram() {
       </div>
     );
   }
-
-  // Debug logging
-  useEffect(() => {
-    console.log('=== COMPONENT RENDERED ===');
-    console.log('Nodes:', nodes.length);
-    console.log('Edges:', edges.length);
-    console.log('First few edges:', edges.slice(0, 3));
-  }, [nodes, edges]);
 
   return (
     <div 
@@ -676,3 +670,5 @@ export default function ExecutionFlowDiagram() {
     </div>
   );
 };
+export default ExecutionFlowDiagram;
+export { ExecutionFlowDiagram };
