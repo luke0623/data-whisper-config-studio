@@ -32,7 +32,7 @@ async function getAllModelsExample() {
     const paginationParams: PaginationParams = {
       page: 1,
       limit: 10,
-      sortBy: 'created_at',
+      sortBy: 'createdAt',
       sortOrder: 'desc',
       search: 'user'
     };
@@ -76,15 +76,15 @@ async function getModelByIdExample() {
 async function createModelExample() {
   try {
     const newModelData: CreateModelRequest = {
-      model_name: 'User Behavior Analysis Model',
-      depend_on: 'user_events,user_profiles',
-      raw_topic_code: 'user_behavior_analysis',
-      is_paralleled: true,
+      modelName: 'User Behavior Analysis Model',
+      dependOn: 'user_events,user_profiles',
+      rawTopicCode: 'user_behavior_analysis',
+      isParalleled: true,
       version: '1.0.0',
-      tenant_id: 'tenant-001',
-      created_by: 'user-123',
-      last_modified_by: 'user-123',
-      module_id: 'module-456',
+      tenantId: 'tenant-001',
+      createdBy: 'user-123',
+      lastModifiedBy: 'user-123',
+      moduleId: 'module-456',
       priority: 1
     };
 
@@ -105,10 +105,10 @@ async function updateModelExample() {
   try {
     const modelId = 'model-123';
     const updateData: UpdateModelRequest = {
-      model_name: 'Updated User Behavior Analysis Model',
+      modelName: 'Updated User Behavior Analysis Model',
       version: '1.1.0',
       priority: 2,
-      last_modified_by: 'user-456'
+      lastModifiedBy: 'user-456'
     };
 
     const updatedModel = await modelService.updateModel(modelId, updateData);
@@ -195,37 +195,37 @@ async function fullCrudExample() {
     // 1. 创建模型
     console.log('1. 创建新模型...');
     const newModel: CreateModelRequest = {
-      model_name: 'Test Model',
-      depend_on: 'test_data',
-      raw_topic_code: 'test_model',
-      is_paralleled: false,
+      modelName: 'Test Model',
+      dependOn: 'test_data',
+      rawTopicCode: 'test_model',
+      isParalleled: false,
       version: '1.0.0',
-      tenant_id: 'test-tenant',
-      created_by: 'test-user',
-      last_modified_by: 'test-user',
-      module_id: 'test-module',
+      tenantId: 'test-tenant',
+      createdBy: 'test-user',
+      lastModifiedBy: 'test-user',
+      moduleId: 'test-module',
       priority: 0
     };
     
     const created = await modelService.createModel(newModel);
-    console.log('创建成功:', created.model_id);
+    console.log('创建成功:', created.modelId);
     
     // 2. 读取模型
     console.log('2. 读取模型详情...');
-    const retrieved = await modelService.getModelById(created.model_id);
-    console.log('读取成功:', retrieved.model_name);
+    const retrieved = await modelService.getModelById(created.modelId);
+    console.log('读取成功:', retrieved.modelName);
     
     // 3. 更新模型
     console.log('3. 更新模型...');
-    const updated = await modelService.updateModel(created.model_id, {
-      model_name: 'Updated Test Model',
+    const updated = await modelService.updateModel(created.modelId, {
+      modelName: 'Updated Test Model',
       version: '1.1.0'
     });
-    console.log('更新成功:', updated.model_name);
+    console.log('更新成功:', updated.modelName);
     
     // 4. 删除模型
     console.log('4. 删除模型...');
-    await modelService.deleteModel(created.model_id);
+    await modelService.deleteModel(created.modelId);
     console.log('删除成功');
     
     console.log('=== CRUD 操作完成 ===');

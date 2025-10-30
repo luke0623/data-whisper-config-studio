@@ -4,72 +4,79 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2 } from 'lucide-react';
+import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TableDetailConfig, TableStatus, CreateTableRequest, TableField } from '@/models/table';
+import { 
+  CollectorTableConfig, 
+  TableStatus, 
+  CreateTableRequest, 
+  TableField,
+  Condition,
+  JoinCondition,
+  Dependence,
+  JsonColumn 
+} from '@/models/table';
 import { tableService, TableServiceError } from '@/services/tableService';
 
 const Tables = () => {
-  const [tables, setTables] = useState<TableDetailConfig[]>([]);
+  const [tables, setTables] = useState<CollectorTableConfig[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [viewDialogOpen, setViewDialogOpen] = useState<boolean>(false);
   const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
-  const [selectedTable, setSelectedTable] = useState<TableDetailConfig | null>(null);
-  const [editFormData, setEditFormData] = useState<Partial<TableDetailConfig>>({});
+  const [selectedTable, setSelectedTable] = useState<CollectorTableConfig | null>(null);
+  const [editFormData, setEditFormData] = useState<Partial<CollectorTableConfig>>({});
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(6); // Number of tables displayed per page
   
-  // 新增表格相关状态
+  // New table related states
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false);
-  const [createFormData, setCreateFormData] = useState<CreateTableRequest>({
+  const [createFormData, setCreateFormData] = useState<CollectorTableConfig>({
+    configId: '',
     name: '',
-    description: '',
-    schema: '',
-    status: 'pending',
-    recordCount: 0,
-    fields: [],
-    table_trigger_id: '',
-    table_name: '',
-    data_count: 0,
-    model_name: '',
-    is_extracted: false,
-    model_trigger_id: '',
-    event_trigger_id: '',
-    tenant_id: '',
-    created_by: '',
-    last_modified_by: '',
-    module_trigger_id: ''
+    tableName: '',
+    primaryKey: [],
+    objectKey: '',
+    sequenceKey: '',
+    modelName: '',
+    parentName: '',
+    label: '',
+    joinKeys: [],
+    dependOn: [],
+    conditions: [],
+    jsonColumns: [],
+    auditColumn: '',
+    ignoredColumns: [],
+    dataSourceId: '',
+    isList: false,
+    triggered: false,
+    tenantId: '',
+    createdBy: '',
+    lastModifiedBy: ''
   });
   const [createLoading, setCreateLoading] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // 获取表格数据的函数
+  // Function to fetch table data
   const fetchTables = async () => {
     try {
       setLoading(true);
       setError(null);
       
-      const response = await tableService.getAllTables({
-        page: currentPage,
-        limit: 10,
-        search: searchTerm || undefined,
-        status: selectedStatus !== 'all' ? selectedStatus as TableStatus : undefined,
-        sortBy: 'lastUpdated',
-        sortOrder: 'desc'
-      });
+      const tables = await tableService.getAllTables();
 
-      setTables(response.items);
-      setTotalPages(response.totalPages);
-      setTotalCount(response.total);
+      setTables(tables);
+      // setTotalPages(response.totalPages);
+      // setTotalCount(response.total);
     } catch (error) {
       console.error('Error fetching tables:', error);
       if (error instanceof TableServiceError) {
@@ -77,96 +84,63 @@ const Tables = () => {
       } else {
         setError('Failed to fetch tables. Please try again.');
       }
-      // 在错误情况下，使用模拟数据作为后备
-      const mockTables: TableDetailConfig[] = [
+      // In case of error, use mock data as fallback
+      const mockTables: CollectorTableConfig[] = [
         {
-          id: '1',
+          configId: '1',
           name: 'Customers',
-          description: 'Customer master data including contact information',
-          schema: 'public',
-          status: 'active',
-          lastUpdated: '2023-06-15',
-          recordCount: 15420,
-          fields: [
-            { name: 'customer_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-            { name: 'name', type: 'varchar(100)', description: 'Customer name', isPrimaryKey: false },
-            { name: 'email', type: 'varchar(255)', description: 'Email address', isPrimaryKey: false },
-            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-          ],
-          table_trigger_id: 'trig_cust_001',
-          table_name: 'customers',
-          data_count: 15420,
-          model_name: 'Customer Model',
-          is_extracted: true,
-          model_trigger_id: 'mod_trig_001',
-          event_trigger_id: 'evt_trig_001',
-          tenant_id: 'tenant_001',
-          created_at: '2023-01-15',
-          created_by: 'admin',
-          last_modified_at: '2023-06-15',
-          last_modified_by: 'system',
-          module_trigger_id: 'mod_001'
+          label: 'Customer master data including contact information',
+          modelName: 'Customer',
+          tableName: 'customers',
+          primaryKey: ['customer_id'],
+          objectKey: 'customer_id',
+          tenantId: 'tenant_001',
+          createdAt: '2023-01-15',
+          createdBy: 'admin',
+          lastModifiedAt: '2023-06-15',
+          lastModifiedBy: 'system'
         },
         {
-          id: '2',
+          configId: '2',
           name: 'Orders',
-          description: 'Order transactions with customer references',
-          schema: 'sales',
-          status: 'active',
-          lastUpdated: '2023-06-18',
-          recordCount: 32150,
-          fields: [
-            { name: 'order_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-            { name: 'customer_id', type: 'uuid', description: 'Reference to customer', isPrimaryKey: false },
-            { name: 'amount', type: 'decimal(10,2)', description: 'Order amount', isPrimaryKey: false },
-            { name: 'status', type: 'varchar(20)', description: 'Order status', isPrimaryKey: false },
-            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-          ],
-          table_trigger_id: 'trig_ord_001',
-          table_name: 'orders',
-          data_count: 32150,
-          model_name: 'Order Model',
-          is_extracted: true,
-          model_trigger_id: 'mod_trig_002',
-          event_trigger_id: 'evt_trig_002',
-          tenant_id: 'tenant_001',
-          created_at: '2023-02-10',
-          created_by: 'admin',
-          last_modified_at: '2023-06-18',
-          last_modified_by: 'system',
-          module_trigger_id: 'mod_002'
+          label: 'Order transactions with customer references',
+          modelName: 'Order',
+          tableName: 'orders',
+          primaryKey: ['order_id'],
+          objectKey: 'order_id',
+          tenantId: 'tenant_001',
+          createdAt: '2023-02-10',
+          createdBy: 'admin',
+          lastModifiedAt: '2023-06-18',
+          lastModifiedBy: 'system'
         },
         {
-          id: '3',
+          configId: '3',
           name: 'Products',
-          description: 'Product catalog with pricing information',
-          schema: 'inventory',
-          status: 'inactive',
-          lastUpdated: '2023-05-30',
-          recordCount: 8745,
-          fields: [
-            { name: 'product_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-            { name: 'name', type: 'varchar(100)', description: 'Product name', isPrimaryKey: false },
-            { name: 'price', type: 'decimal(10,2)', description: 'Product price', isPrimaryKey: false },
-            { name: 'category', type: 'varchar(50)', description: 'Product category', isPrimaryKey: false },
-            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-          ],
+          label: 'Product catalog with pricing information',
+          modelName: 'Product',
+          tableName: 'products',
+          primaryKey: ['product_id'],
+          objectKey: 'product_id',
+          tenantId: 'tenant_001',
+          createdAt: '2023-01-20',
+          createdBy: 'admin',
+          lastModifiedAt: '2023-05-30',
+          lastModifiedBy: 'system'
         },
         {
-          id: '4',
+          configId: '4',
           name: 'Suppliers',
-          description: 'Supplier information and contact details',
-          schema: 'inventory',
-          status: 'pending',
-          lastUpdated: '2023-06-10',
-          recordCount: 320,
-          fields: [
-            { name: 'supplier_id', type: 'uuid', description: 'Unique identifier', isPrimaryKey: true },
-            { name: 'name', type: 'varchar(100)', description: 'Supplier name', isPrimaryKey: false },
-            { name: 'contact_email', type: 'varchar(255)', description: 'Contact email', isPrimaryKey: false },
-            { name: 'country', type: 'varchar(50)', description: 'Country', isPrimaryKey: false },
-            { name: 'created_at', type: 'timestamp', description: 'Creation date', isPrimaryKey: false },
-          ],
+          label: 'Supplier information and contact details',
+          modelName: 'Supplier',
+          tableName: 'suppliers',
+          primaryKey: ['supplier_id'],
+          objectKey: 'supplier_id',
+          tenantId: 'tenant_001',
+          createdAt: '2023-03-01',
+          createdBy: 'admin',
+          lastModifiedAt: '2023-06-10',
+          lastModifiedBy: 'system'
         },
       ];
       setTables(mockTables);
@@ -182,12 +156,54 @@ const Tables = () => {
   }, [currentPage, searchTerm, selectedStatus]);
 
   // Filter tables based on search term and status
-  const filteredTables = tables.filter((table) => {
-    const matchesSearch = table.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         table.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = selectedStatus === 'all' || table.status === selectedStatus;
-    return matchesSearch && matchesStatus;
+  const filteredTables = (tables || []).filter((table) => {
+    const matchesSearch = table.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (table.label && table.label.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Note: CollectorTableConfig doesn't have status field, so we'll remove status filtering for now
+    return matchesSearch;
   });
+
+  // Pagination calculation logic
+  const totalFilteredCount = filteredTables.length;
+  const calculatedTotalPages = Math.ceil(totalFilteredCount / pageSize);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const paginatedTables = filteredTables.slice(startIndex, endIndex);
+
+  // Update pagination state
+  React.useEffect(() => {
+    setTotalCount(totalFilteredCount);
+    setTotalPages(calculatedTotalPages);
+    
+    // If current page exceeds total pages, reset to first page
+    if (currentPage > calculatedTotalPages && calculatedTotalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [totalFilteredCount, calculatedTotalPages, currentPage, pageSize]);
+
+  // Pagination control functions
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize);
+    setCurrentPage(1); // Reset to first page
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
@@ -202,31 +218,38 @@ const Tables = () => {
     }
   };
 
-  const handleViewTable = (table: TableDetailConfig) => {
+  const handleViewTable = (table: CollectorTableConfig) => {
     setSelectedTable(table);
     setViewDialogOpen(true);
   };
 
-  const handleEditTable = (table: TableDetailConfig) => {
+  const handleEditTable = (table: CollectorTableConfig) => {
     setSelectedTable(table);
     setEditFormData({
+      configId: table.configId,
       name: table.name,
-      description: table.description,
-      schema: table.schema,
-      status: table.status,
-      table_trigger_id: table.table_trigger_id || '',
-      table_name: table.table_name || '',
-      data_count: table.data_count || 0,
-      model_name: table.model_name || '',
-      is_extracted: table.is_extracted || false,
-      model_trigger_id: table.model_trigger_id || '',
-      event_trigger_id: table.event_trigger_id || '',
-      tenant_id: table.tenant_id || '',
-      created_at: table.created_at || '',
-      created_by: table.created_by || '',
-      last_modified_at: table.last_modified_at || '',
-      last_modified_by: table.last_modified_by || '',
-      module_trigger_id: table.module_trigger_id || ''
+      label: table.label,
+      modelName: table.modelName,
+      tableName: table.tableName,
+      primaryKey: table.primaryKey,
+      objectKey: table.objectKey,
+      sequenceKey: table.sequenceKey,
+      parentName: table.parentName,
+      joinKeys: table.joinKeys,
+      dependOn: table.dependOn,
+      conditions: table.conditions,
+      jsonColumns: table.jsonColumns,
+      auditColumn: table.auditColumn,
+      ignoredColumns: table.ignoredColumns,
+      dataSourceId: table.dataSourceId,
+      isList: table.isList,
+      triggered: table.triggered,
+      tenantId: table.tenantId,
+      createdAt: table.createdAt,
+      createdBy: table.createdBy,
+      lastModifiedAt: table.lastModifiedAt,
+      lastModifiedBy: table.lastModifiedBy,
+      version: table.version
     });
     setEditDialogOpen(true);
   };
@@ -238,16 +261,16 @@ const Tables = () => {
       setLoading(true);
       setError(null);
 
-      // 调用TableService更新表格
-      const updatedTable = await tableService.updateTable(selectedTable.id, editFormData);
+      // Call TableService to update table
+      const updatedTable = await tableService.updateTable(selectedTable.configId!, editFormData);
       
-      // 更新本地状态
+      // Update local state
       const updatedTables = tables.map(table => 
-        table.id === selectedTable.id ? updatedTable : table
+        table.configId === selectedTable.configId ? updatedTable : table
       );
       setTables(updatedTables);
       
-      // 关闭对话框并重置状态
+      // Close dialog and reset state
       setEditDialogOpen(false);
       setSelectedTable(null);
       setEditFormData({});
@@ -259,10 +282,10 @@ const Tables = () => {
         setError('Failed to update table. Please try again.');
       }
       
-      // 在错误情况下，仍然进行本地更新作为后备
+      // In case of error, still perform local update as fallback
       const updatedTables = tables.map(table => 
-        table.id === selectedTable.id 
-          ? { ...table, ...editFormData, lastUpdated: new Date().toISOString().split('T')[0] }
+        table.configId === selectedTable.configId 
+          ? { ...table, ...editFormData, lastModifiedAt: new Date().toISOString() }
           : table
       );
       setTables(updatedTables);
@@ -283,15 +306,15 @@ const Tables = () => {
       setLoading(true);
       setError(null);
 
-      // 调用TableService删除表格
+      // Call TableService to delete table
       await tableService.deleteTable(tableId);
       
-      // 更新本地状态，移除已删除的表格
-      const updatedTables = tables.filter(table => table.id !== tableId);
+      // Update local state, remove deleted table
+      const updatedTables = tables.filter(table => table.configId !== tableId);
       setTables(updatedTables);
       
-      // 如果当前选中的表格被删除，清除选中状态
-      if (selectedTable?.id === tableId) {
+      // If currently selected table is deleted, clear selection state
+      if (selectedTable?.configId === tableId) {
         setSelectedTable(null);
         setViewDialogOpen(false);
         setEditDialogOpen(false);
@@ -308,101 +331,68 @@ const Tables = () => {
     }
   };
 
-  // 重置新增表格表单
+  // Reset create table form
   const resetCreateForm = () => {
     setCreateFormData({
+      configId: '',
       name: '',
-      description: '',
-      schema: '',
-      status: 'pending',
-      recordCount: 0,
-      fields: [],
-      table_trigger_id: '',
-      table_name: '',
-      data_count: 0,
-      model_name: '',
-      is_extracted: false,
-      model_trigger_id: '',
-      event_trigger_id: '',
-      tenant_id: '',
-      created_by: '',
-      last_modified_by: '',
-      module_trigger_id: ''
+      label: '',
+      modelName: '',
+      tableName: '',
+      tenantId: '',
+      createdBy: '',
+      lastModifiedBy: '',
+      primaryKey: [],
+      objectKey: '',
+      sequenceKey: '',
+      parentName: '',
+      joinKeys: [],
+      dependOn: [],
+      conditions: [],
+      jsonColumns: [],
+      auditColumn: '',
+      ignoredColumns: [],
+      dataSourceId: '',
+      isList: false,
+      triggered: false
     });
     setFormErrors({});
     setSuccessMessage(null);
   };
 
-  // 验证表单数据
+  // Validate form data
   const validateForm = (): boolean => {
     const errors: {[key: string]: string} = {};
 
-    // 验证必填字段
+    // Validate required fields
     if (!createFormData.name.trim()) {
-      errors.name = '表格名称不能为空';
+      errors.name = 'Table name cannot be empty';
     } else if (createFormData.name.length < 2) {
-      errors.name = '表格名称至少需要2个字符';
+      errors.name = 'Table name must be at least 2 characters';
     } else if (!/^[a-zA-Z0-9_-]+$/.test(createFormData.name)) {
-      errors.name = '表格名称只能包含字母、数字、下划线和连字符';
+      errors.name = 'Table name can only contain letters, numbers, underscores and hyphens';
     }
 
-    if (!createFormData.schema.trim()) {
-      errors.schema = '数据库模式不能为空';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(createFormData.schema)) {
-      errors.schema = '数据库模式只能包含字母、数字和下划线';
+    if (!createFormData.modelName.trim()) {
+      errors.modelName = 'Model name cannot be empty';
+    } else if (!/^[a-zA-Z0-9_]+$/.test(createFormData.modelName)) {
+      errors.modelName = 'Model name can only contain letters, numbers and underscores';
     }
 
-    // 验证字段
-    if (createFormData.fields.length === 0) {
-      errors.fields = '至少需要添加一个字段';
-    } else {
-      const fieldNames = new Set();
-      let hasPrimaryKey = false;
-      
-      createFormData.fields.forEach((field, index) => {
-        if (!field.name.trim()) {
-          errors[`field_${index}_name`] = '字段名称不能为空';
-        } else if (!/^[a-zA-Z0-9_]+$/.test(field.name)) {
-          errors[`field_${index}_name`] = '字段名称只能包含字母、数字和下划线';
-        } else if (fieldNames.has(field.name)) {
-          errors[`field_${index}_name`] = '字段名称不能重复';
-        } else {
-          fieldNames.add(field.name);
-        }
-
-        if (!field.type) {
-          errors[`field_${index}_type`] = '请选择字段类型';
-        }
-
-        if (field.isPrimaryKey) {
-          if (hasPrimaryKey) {
-            errors[`field_${index}_primary`] = '只能有一个主键字段';
-          }
-          hasPrimaryKey = true;
-        }
-      });
-
-      if (!hasPrimaryKey) {
-        errors.primary_key = '至少需要设置一个主键字段';
-      }
-    }
-
-    // 验证记录数量
-    if (createFormData.recordCount < 0) {
-      errors.recordCount = '记录数量不能为负数';
-    }
+    // Note: Field validation removed as CollectorTableConfig doesn't have fields property
+    // Note: Record count validation removed as CollectorTableConfig doesn't have recordCount property
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
-  // 处理新增表格
+  // Handle create table
   const handleCreateTable = async () => {
     try {
       setCreateLoading(true);
       setError(null);
 
-      // 表单验证
+      // Form validation
       if (!validateForm()) {
         setCreateLoading(false);
         return;
@@ -410,55 +400,27 @@ const Tables = () => {
 
       await tableService.createTable(createFormData);
       
-      // 创建成功后关闭对话框并重新获取数据
+      // Close dialog and refresh data after successful creation
       setCreateDialogOpen(false);
       resetCreateForm();
-      setSuccessMessage(`表格 "${createFormData.name}" 创建成功！`);
+      setSuccessMessage(`Table "${createFormData.name}" created successfully!`);
       await fetchTables();
       
-      // 3秒后清除成功消息
+      // Clear success message after 3 seconds
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       if (err instanceof TableServiceError) {
-        setError(`创建表格失败: ${err.message}`);
+        setError(`Failed to create table: ${err.message}`);
       } else {
-        setError('创建表格时发生未知错误');
+        setError('Unknown error occurred while creating table');
       }
-      console.error('创建表格失败:', err);
+      console.error('Failed to create table:', err);
     } finally {
       setCreateLoading(false);
     }
   };
 
-  // 添加字段
-  const addField = () => {
-    const newField: TableField = {
-      name: '',
-      type: 'string',
-      isPrimaryKey: false,
-      description: ''
-    };
-    setCreateFormData(prev => ({
-      ...prev,
-      fields: [...prev.fields, newField]
-    }));
-  };
-
-  // 删除字段
-  const removeField = (index: number) => {
-    setCreateFormData(prev => ({
-      ...prev,
-      fields: prev.fields.filter((_, i) => i !== index)
-    }));
-  };
-
-  // 更新字段
-  const updateField = (index: number, field: TableField) => {
-    setCreateFormData(prev => ({
-      ...prev,
-      fields: prev.fields.map((f, i) => i === index ? field : f)
-    }));
-  };
+  // Note: Field management functions removed as CollectorTableConfig doesn't have fields property
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
@@ -592,57 +554,61 @@ const Tables = () => {
 
       {/* Table list */}
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
             <Card key={i} className="border border-gray-200 shadow-sm rounded-xl overflow-hidden">
-              <div className="p-6 animate-pulse">
-                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-                <div className="h-4 bg-gray-200 rounded w-2/3 mb-6"></div>
-                <div className="space-y-3">
+              <div className="p-5 animate-pulse">
+                <div className="h-5 bg-gray-200 rounded w-1/2 mb-3"></div>
+                <div className="h-3 bg-gray-200 rounded w-3/4 mb-4"></div>
+                <div className="space-y-2">
                   <div className="h-3 bg-gray-200 rounded w-full"></div>
                   <div className="h-3 bg-gray-200 rounded w-full"></div>
-                  <div className="h-3 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-3 bg-gray-200 rounded w-2/3"></div>
                 </div>
               </div>
             </Card>
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {filteredTables.length > 0 ? (
-            filteredTables.map((table) => (
-              <Card key={table.id} className="border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200">
-                <CardHeader className="pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedTables.length > 0 ? (
+            paginatedTables.map((table) => (
+              <Card key={table.configId} className="border border-gray-200 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow duration-200">
+                <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <CardTitle className="text-xl">{table.name}</CardTitle>
-                      <CardDescription className="mt-1">{table.description}</CardDescription>
+                    <div className="flex-1">
+                      <CardTitle className="text-lg font-semibold text-gray-900">{table.name}</CardTitle>
+                      {table.label && (
+                        <CardDescription className="mt-1 text-sm text-gray-600 line-clamp-2">
+                          {table.label}
+                        </CardDescription>
+                      )}
                     </div>
-                    <Badge variant="secondary" className={`capitalize ${table.status === 'active' ? 'bg-green-100 text-green-800' : table.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {table.status}
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 ml-3 flex-shrink-0">
+                      {table.triggered ? 'Triggered' : 'Manual'}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                    <div>
-                      <p className="text-gray-500">Schema</p>
-                      <p className="font-medium">{table.schema}</p>
+                <CardContent className="pt-0">
+                  <div className="space-y-3 mb-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Model</span>
+                      <span className="text-sm font-medium text-gray-900">{table.modelName || 'N/A'}</span>
                     </div>
-                    <div>
-                      <p className="text-gray-500">Records</p>
-                      <p className="font-medium">{table.recordCount.toLocaleString()}</p>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Table</span>
+                      <span className="text-sm font-medium text-gray-900">{table.tableName || 'N/A'}</span>
                     </div>
-                    <div>
-                      <p className="text-gray-500">Last Updated</p>
-                      <p className="font-medium">{table.lastUpdated}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500">Fields</p>
-                      <p className="font-medium">{table.fields.length}</p>
-                    </div>
+                    {table.primaryKey && table.primaryKey.length > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-500">Primary Key</span>
+                        <span className="text-sm font-medium text-gray-900 truncate ml-2">
+                          {table.primaryKey.join(', ')}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-end gap-2 mt-4">
+                  <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -665,7 +631,7 @@ const Tables = () => {
                       variant="destructive" 
                       size="sm" 
                       className="gap-1"
-                      onClick={() => handleDeleteTable(table.id)}
+                      onClick={() => table.configId && handleDeleteTable(table.configId)}
                     >
                       <Trash2 className="h-4 w-4" />
                       Delete
@@ -675,7 +641,7 @@ const Tables = () => {
               </Card>
             ))
           ) : (
-            <div className="col-span-2 bg-gray-50 rounded-lg p-8 text-center">
+            <div className="col-span-full bg-gray-50 rounded-lg p-8 text-center">
               <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                 <Database className="h-6 w-6 text-gray-400" />
               </div>
@@ -686,6 +652,101 @@ const Tables = () => {
               </Button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Pagination Controls */}
+      {totalFilteredCount > 0 && (
+        <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 px-2">
+          {/* Pagination Info */}
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <span>
+              Showing {Math.min(startIndex + 1, totalFilteredCount)} - {Math.min(endIndex, totalFilteredCount)} of {totalFilteredCount} items
+            </span>
+            <div className="flex items-center gap-2">
+              <span>Items per page:</span>
+              <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(Number(value))}>
+                <SelectTrigger className="w-20 h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6</SelectItem>
+                  <SelectItem value="12">12</SelectItem>
+                  <SelectItem value="24">24</SelectItem>
+                  <SelectItem value="48">48</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Pagination Buttons */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrevPage}
+              disabled={currentPage === 1}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            
+            {/* Page Number Buttons */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNumber;
+                if (totalPages <= 5) {
+                  pageNumber = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNumber = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNumber = totalPages - 4 + i;
+                } else {
+                  pageNumber = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNumber}
+                    variant={currentPage === pageNumber ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePageChange(pageNumber)}
+                    className="h-8 w-8 p-0"
+                  >
+                    {pageNumber}
+                  </Button>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={currentPage === totalPages}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages}
+              className="h-8 w-8 p-0"
+            >
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -700,63 +761,157 @@ const Tables = () => {
           </DialogHeader>
           {selectedTable && (
             <div className="space-y-6">
+              {/* Basic Information */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-500">Table Name</Label>
                   <p className="text-lg font-semibold">{selectedTable.name}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Status</Label>
-                  <Badge variant="secondary" className={`capitalize ${selectedTable.status === 'active' ? 'bg-green-100 text-green-800' : selectedTable.status === 'inactive' ? 'bg-gray-100 text-gray-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                    {selectedTable.status}
+                  <Label className="text-sm font-medium text-gray-500">Config ID</Label>
+                  <p className="font-medium text-sm text-gray-600">{selectedTable.configId || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Table Name (DB)</Label>
+                  <p className="font-medium">{selectedTable.tableName || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-500">Triggered</Label>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    {selectedTable.triggered ? 'Triggered' : 'Manual'}
                   </Badge>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Schema</Label>
-                  <p className="font-medium">{selectedTable.schema}</p>
+                  <Label className="text-sm font-medium text-gray-500">Model Name</Label>
+                  <p className="font-medium">{selectedTable.modelName || 'N/A'}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Record Count</Label>
-                  <p className="font-medium">{selectedTable.recordCount.toLocaleString()}</p>
+                  <Label className="text-sm font-medium text-gray-500">Parent Name</Label>
+                  <p className="font-medium">{selectedTable.parentName || 'N/A'}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Last Updated</Label>
-                  <p className="font-medium">{selectedTable.lastUpdated}</p>
+                  <Label className="text-sm font-medium text-gray-500">Version</Label>
+                  <p className="font-medium">{selectedTable.version || '1.0'}</p>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium text-gray-500">Total Fields</Label>
-                  <p className="font-medium">{selectedTable.fields.length}</p>
+                  <Label className="text-sm font-medium text-gray-500">Type</Label>
+                  <p className="font-medium">{selectedTable.isList ? 'List' : 'Single'}</p>
                 </div>
               </div>
               
               <div>
-                <Label className="text-sm font-medium text-gray-500">Description</Label>
-                <p className="mt-1">{selectedTable.description}</p>
+                <Label className="text-sm font-medium text-gray-500">Label</Label>
+                <p className="mt-1">{selectedTable.label || 'N/A'}</p>
               </div>
 
+              {/* Audit Information */}
               <div>
-                <Label className="text-sm font-medium text-gray-500 mb-3 block">Table Fields</Label>
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-gray-50 grid grid-cols-4 gap-4 p-3 text-sm font-medium text-gray-700">
-                    <div>Field Name</div>
-                    <div>Data Type</div>
-                    <div>Description</div>
-                    <div>Primary Key</div>
+                <Label className="text-sm font-medium text-gray-500 mb-3 block">Audit Information</Label>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-gray-500">Created At</p>
+                    <p className="font-medium">{selectedTable.createdAt || 'N/A'}</p>
                   </div>
-                  {selectedTable.fields.map((field, index) => (
-                    <div key={index} className="grid grid-cols-4 gap-4 p-3 border-t text-sm">
-                      <div className="font-medium">{field.name}</div>
-                      <div className="text-gray-600">{field.type}</div>
-                      <div className="text-gray-600">{field.description}</div>
-                      <div>
-                        {field.isPrimaryKey && (
-                          <Badge variant="outline" className="text-xs">PK</Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  <div>
+                    <p className="text-gray-500">Created By</p>
+                    <p className="font-medium">{selectedTable.createdBy || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Last Modified</p>
+                    <p className="font-medium">{selectedTable.lastModifiedAt || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Modified By</p>
+                    <p className="font-medium">{selectedTable.lastModifiedBy || 'N/A'}</p>
+                  </div>
                 </div>
               </div>
+
+              {/* Configuration Details */}
+              <div>
+                <Label className="text-sm font-medium text-gray-500 mb-3 block">Configuration Details</Label>
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 grid grid-cols-3 gap-4 p-3 text-sm font-medium text-gray-700">
+                    <div>Property</div>
+                    <div>Value</div>
+                    <div>Description</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                    <div className="font-medium">Primary Key</div>
+                    <div className="text-gray-600">{selectedTable.primaryKey?.join(', ') || 'None'}</div>
+                    <div className="text-gray-600">Primary key columns</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                    <div className="font-medium">Object Key</div>
+                    <div className="text-gray-600">{selectedTable.objectKey || 'None'}</div>
+                    <div className="text-gray-600">Object identifier key</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                    <div className="font-medium">Sequence Key</div>
+                    <div className="text-gray-600">{selectedTable.sequenceKey || 'None'}</div>
+                    <div className="text-gray-600">Sequence identifier key</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                    <div className="font-medium">Data Source</div>
+                    <div className="text-gray-600">{selectedTable.dataSourceId || 'Default'}</div>
+                    <div className="text-gray-600">Data source identifier</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                    <div className="font-medium">Tenant ID</div>
+                    <div className="text-gray-600">{selectedTable.tenantId || 'None'}</div>
+                    <div className="text-gray-600">Tenant identifier</div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                    <div className="font-medium">Audit Column</div>
+                    <div className="text-gray-600">{selectedTable.auditColumn || 'None'}</div>
+                    <div className="text-gray-600">Column for audit tracking</div>
+                  </div>
+                  {selectedTable.ignoredColumns && selectedTable.ignoredColumns.length > 0 && (
+                    <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
+                      <div className="font-medium">Ignored Columns</div>
+                      <div className="text-gray-600">{selectedTable.ignoredColumns.join(', ')}</div>
+                      <div className="text-gray-600">Columns to ignore during processing</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Complex Configurations */}
+              {(selectedTable.joinKeys && selectedTable.joinKeys.length > 0) && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500 mb-3 block">Join Conditions</Label>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm text-gray-600">{selectedTable.joinKeys.length} join condition(s) configured</p>
+                  </div>
+                </div>
+              )}
+
+              {(selectedTable.dependOn && selectedTable.dependOn.length > 0) && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500 mb-3 block">Dependencies</Label>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm text-gray-600">{selectedTable.dependOn.length} dependenc(y/ies) configured</p>
+                  </div>
+                </div>
+              )}
+
+              {(selectedTable.conditions && selectedTable.conditions.length > 0) && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500 mb-3 block">Conditions</Label>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm text-gray-600">{selectedTable.conditions.length} condition(s) configured</p>
+                  </div>
+                </div>
+              )}
+
+              {(selectedTable.jsonColumns && selectedTable.jsonColumns.length > 0) && (
+                <div>
+                  <Label className="text-sm font-medium text-gray-500 mb-3 block">JSON Columns</Label>
+                  <div className="border rounded-lg p-3 bg-gray-50">
+                    <p className="text-sm text-gray-600">{selectedTable.jsonColumns.length} JSON column(s) configured</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -790,46 +945,45 @@ const Tables = () => {
                     <Label htmlFor="edit-table-name">Table Name (System)</Label>
                     <Input
                       id="edit-table-name"
-                      value={editFormData.table_name || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, table_name: e.target.value })}
+                      value={editFormData.tableName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, tableName: e.target.value })}
                       placeholder="Enter system table name"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-schema">Schema</Label>
+                    <Label htmlFor="edit-model-name">Model Name</Label>
                     <Input
-                      id="edit-schema"
-                      value={editFormData.schema || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, schema: e.target.value })}
-                      placeholder="Enter schema name"
+                      id="edit-model-name"
+                      value={editFormData.modelName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, modelName: e.target.value })}
+                      placeholder="Enter model name"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="edit-status">Status</Label>
+                    <Label htmlFor="edit-triggered">Triggered</Label>
                     <Select
-                      value={editFormData.status || ''}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, status: value as TableStatus })}
+                      value={editFormData.triggered ? 'true' : 'false'}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, triggered: value === 'true' })}
                     >
-                      <SelectTrigger id="edit-status">
-                        <SelectValue placeholder="Select status" />
+                      <SelectTrigger id="edit-triggered">
+                        <SelectValue placeholder="Select trigger mode" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="true">Triggered</SelectItem>
+                        <SelectItem value="false">Manual</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
                   <div className="md:col-span-2">
-                    <Label htmlFor="edit-description">Description</Label>
+                    <Label htmlFor="edit-label">Label</Label>
                     <Textarea
-                      id="edit-description"
-                      value={editFormData.description || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                      placeholder="Enter table description"
+                      id="edit-label"
+                      value={editFormData.label || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
+                      placeholder="Enter table label"
                       rows={3}
                     />
                   </div>
@@ -839,91 +993,72 @@ const Tables = () => {
               <Separator />
 
               <div>
-                <h3 className="text-lg font-medium mb-4">Trigger & Model Information</h3>
+                <h3 className="text-lg font-medium mb-4">Configuration Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit-table-trigger-id">Table Trigger ID</Label>
+                    <Label htmlFor="edit-object-key">Object Key</Label>
                     <Input
-                      id="edit-table-trigger-id"
-                      value={editFormData.table_trigger_id || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, table_trigger_id: e.target.value })}
-                      placeholder="Enter table trigger ID"
+                      id="edit-object-key"
+                      value={editFormData.objectKey || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, objectKey: e.target.value })}
+                      placeholder="Enter object key"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-model-trigger-id">Model Trigger ID</Label>
+                    <Label htmlFor="edit-sequence-key">Sequence Key</Label>
                     <Input
-                      id="edit-model-trigger-id"
-                      value={editFormData.model_trigger_id || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, model_trigger_id: e.target.value })}
-                      placeholder="Enter model trigger ID"
+                      id="edit-sequence-key"
+                      value={editFormData.sequenceKey || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, sequenceKey: e.target.value })}
+                      placeholder="Enter sequence key"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-event-trigger-id">Event Trigger ID</Label>
+                    <Label htmlFor="edit-parent-name">Parent Name</Label>
                     <Input
-                      id="edit-event-trigger-id"
-                      value={editFormData.event_trigger_id || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, event_trigger_id: e.target.value })}
-                      placeholder="Enter event trigger ID"
+                      id="edit-parent-name"
+                      value={editFormData.parentName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, parentName: e.target.value })}
+                      placeholder="Enter parent name"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-module-trigger-id">Module Trigger ID</Label>
+                    <Label htmlFor="edit-data-source-id">Data Source ID</Label>
                     <Input
-                      id="edit-module-trigger-id"
-                      value={editFormData.module_trigger_id || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, module_trigger_id: e.target.value })}
-                      placeholder="Enter module trigger ID"
+                      id="edit-data-source-id"
+                      value={editFormData.dataSourceId || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, dataSourceId: e.target.value })}
+                      placeholder="Enter data source ID"
                     />
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-model-name">Model Name</Label>
-                    <Input
-                      id="edit-model-name"
-                      value={editFormData.model_name || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, model_name: e.target.value })}
-                      placeholder="Enter model name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-is-extracted" className="block mb-2">Is Extracted</Label>
+                    <Label htmlFor="edit-is-list" className="block mb-2">Is List</Label>
                     <Select
-                      value={editFormData.is_extracted ? 'true' : 'false'}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, is_extracted: value === 'true' })}
+                      value={editFormData.isList ? 'true' : 'false'}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, isList: value === 'true' })}
                     >
-                      <SelectTrigger id="edit-is-extracted">
-                        <SelectValue placeholder="Select extraction status" />
+                      <SelectTrigger id="edit-is-list">
+                        <SelectValue placeholder="Select list type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
+                        <SelectItem value="true">List</SelectItem>
+                        <SelectItem value="false">Single</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <div>
-                    <Label htmlFor="edit-data-count">Data Count</Label>
-                    <Input
-                      id="edit-data-count"
-                      type="number"
-                      value={editFormData.data_count?.toString() || '0'}
-                      onChange={(e) => setEditFormData({ ...editFormData, data_count: parseInt(e.target.value) || 0 })}
-                      placeholder="Enter data count"
-                    />
-                  </div>
+
 
                   <div>
                     <Label htmlFor="edit-tenant-id">Tenant ID</Label>
                     <Input
                       id="edit-tenant-id"
-                      value={editFormData.tenant_id || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, tenant_id: e.target.value })}
+                      value={editFormData.tenantId || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, tenantId: e.target.value })}
                       placeholder="Enter tenant ID"
                     />
                   </div>
@@ -933,6 +1068,131 @@ const Tables = () => {
               <Separator />
 
               <div>
+                <h3 className="text-lg font-medium mb-4">Collector Configuration</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-primary-key">Primary Key</Label>
+                    <Input
+                      id="edit-primary-key"
+                      value={editFormData.primaryKey?.join(', ') || ''}
+                      onChange={(e) => setEditFormData({ 
+                        ...editFormData, 
+                        primaryKey: e.target.value.split(',').map(k => k.trim()).filter(k => k) 
+                      })}
+                      placeholder="Enter primary keys (comma separated)"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-object-key">Object Key</Label>
+                    <Input
+                      id="edit-object-key"
+                      value={editFormData.objectKey || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, objectKey: e.target.value })}
+                      placeholder="Enter object key"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-sequence-key">Sequence Key</Label>
+                    <Input
+                      id="edit-sequence-key"
+                      value={editFormData.sequenceKey || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, sequenceKey: e.target.value })}
+                      placeholder="Enter sequence key"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-parent-name">Parent Name</Label>
+                    <Input
+                      id="edit-parent-name"
+                      value={editFormData.parentName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, parentName: e.target.value })}
+                      placeholder="Enter parent name"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-label">Label</Label>
+                    <Input
+                      id="edit-label"
+                      value={editFormData.label || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
+                      placeholder="Enter label"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-audit-column">Audit Column</Label>
+                    <Input
+                      id="edit-audit-column"
+                      value={editFormData.auditColumn || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, auditColumn: e.target.value })}
+                      placeholder="Enter audit column"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-ignored-columns">Ignored Columns</Label>
+                    <Input
+                      id="edit-ignored-columns"
+                      value={editFormData.ignoredColumns?.join(', ') || ''}
+                      onChange={(e) => setEditFormData({ 
+                        ...editFormData, 
+                        ignoredColumns: e.target.value.split(',').map(c => c.trim()).filter(c => c) 
+                      })}
+                      placeholder="Enter ignored columns (comma separated)"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-data-source-id">Data Source ID</Label>
+                    <Input
+                      id="edit-data-source-id"
+                      value={editFormData.dataSourceId || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, dataSourceId: e.target.value })}
+                      placeholder="Enter data source ID"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-is-list" className="block mb-2">Is List</Label>
+                    <Select
+                      value={editFormData.isList ? 'true' : 'false'}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, isList: value === 'true' })}
+                    >
+                      <SelectTrigger id="edit-is-list">
+                        <SelectValue placeholder="Select list status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-triggered" className="block mb-2">Triggered</Label>
+                    <Select
+                      value={editFormData.triggered ? 'true' : 'false'}
+                      onValueChange={(value) => setEditFormData({ ...editFormData, triggered: value === 'true' })}
+                    >
+                      <SelectTrigger id="edit-triggered">
+                        <SelectValue placeholder="Select trigger status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="true">Yes</SelectItem>
+                        <SelectItem value="false">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* <div>
                 <h3 className="text-lg font-medium mb-4">Audit Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -940,8 +1200,8 @@ const Tables = () => {
                     <Input
                       id="edit-created-at"
                       type="date"
-                      value={editFormData.created_at || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, created_at: e.target.value })}
+                      value={editFormData.createdAt || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, createdAt: e.target.value })}
                     />
                   </div>
 
@@ -949,8 +1209,8 @@ const Tables = () => {
                     <Label htmlFor="edit-created-by">Created By</Label>
                     <Input
                       id="edit-created-by"
-                      value={editFormData.created_by || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, created_by: e.target.value })}
+                      value={editFormData.createdBy || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, createdBy: e.target.value })}
                       placeholder="Enter creator name"
                     />
                   </div>
@@ -960,8 +1220,8 @@ const Tables = () => {
                     <Input
                       id="edit-last-modified-at"
                       type="date"
-                      value={editFormData.last_modified_at || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, last_modified_at: e.target.value })}
+                      value={editFormData.lastModifiedAt || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, lastModifiedAt: e.target.value })}
                     />
                   </div>
 
@@ -969,13 +1229,13 @@ const Tables = () => {
                     <Label htmlFor="edit-last-modified-by">Last Modified By</Label>
                     <Input
                       id="edit-last-modified-by"
-                      value={editFormData.last_modified_by || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, last_modified_by: e.target.value })}
+                      value={editFormData.lastModifiedBy || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, lastModifiedBy: e.target.value })}
                       placeholder="Enter modifier name"
                     />
                   </div>
                 </div>
-              </div>
+              </div> */}
               
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
@@ -1045,165 +1305,58 @@ const Tables = () => {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="table-schema">Schema *</Label>
+                  <Label htmlFor="table-model-name">Model Name *</Label>
                   <Input
-                    id="table-schema"
-                    value={createFormData.schema}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, schema: e.target.value }))}
-                    placeholder="Enter schema name"
-                    className={formErrors.schema ? "border-red-500" : ""}
+                    id="table-model-name"
+                    value={createFormData.modelName}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, modelName: e.target.value }))}
+                    placeholder="Enter model name"
+                    className={formErrors.modelName ? "border-red-500" : ""}
                   />
-                  {formErrors.schema && (
-                    <p className="text-sm text-red-600">{formErrors.schema}</p>
+                  {formErrors.modelName && (
+                    <p className="text-sm text-red-600">{formErrors.modelName}</p>
                   )}
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="table-description">Description</Label>
+                <Label htmlFor="table-label">Label</Label>
                 <Textarea
-                  id="table-description"
-                  value={createFormData.description}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Enter table description"
+                  id="table-label"
+                  value={createFormData.label}
+                  onChange={(e) => setCreateFormData(prev => ({ ...prev, label: e.target.value }))}
+                  placeholder="Enter table label"
                   rows={3}
                 />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="table-status">Status</Label>
+                  <Label htmlFor="table-triggered">Triggered</Label>
                   <Select 
-                    value={createFormData.status} 
-                    onValueChange={(value: TableStatus) => setCreateFormData(prev => ({ ...prev, status: value }))}
+                    value={createFormData.triggered ? 'true' : 'false'} 
+                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, triggered: value === 'true' }))}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select status" />
+                      <SelectValue placeholder="Select trigger type" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="inactive">Inactive</SelectItem>
+                      <SelectItem value="true">Triggered</SelectItem>
+                      <SelectItem value="false">Manual</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="record-count">Record Count</Label>
+                  <Label htmlFor="data-source-id">Data Source ID</Label>
                   <Input
-                    id="record-count"
-                    type="number"
-                    value={createFormData.recordCount}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, recordCount: parseInt(e.target.value) || 0 }))}
-                    placeholder="0"
-                    className={formErrors.recordCount ? "border-red-500" : ""}
+                    id="data-source-id"
+                    value={createFormData.dataSourceId}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, dataSourceId: e.target.value }))}
+                    placeholder="Enter data source ID"
                   />
-                  {formErrors.recordCount && (
-                    <p className="text-sm text-red-600">{formErrors.recordCount}</p>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Fields Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium">Table Fields</h3>
-                <Button type="button" variant="outline" size="sm" onClick={addField}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Field
-                </Button>
-              </div>
-              {formErrors.fields && (
-                <p className="text-sm text-red-600">{formErrors.fields}</p>
-              )}
-              {formErrors.primary_key && (
-                <p className="text-sm text-red-600">{formErrors.primary_key}</p>
-              )}
-              {createFormData.fields.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">
-                  No fields added yet. Click "Add Field" to get started.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {createFormData.fields.map((field, index) => (
-                    <div key={index} className="border rounded-lg p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Field {index + 1}</h4>
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="sm" 
-                          onClick={() => removeField(index)}
-                          className="text-red-600 hover:text-red-800"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div className="space-y-2">
-                          <Label>Field Name</Label>
-                          <Input
-                            value={field.name}
-                            onChange={(e) => updateField(index, { ...field, name: e.target.value })}
-                            placeholder="Field name"
-                            className={formErrors[`field_${index}_name`] ? "border-red-500" : ""}
-                          />
-                          {formErrors[`field_${index}_name`] && (
-                            <p className="text-sm text-red-600">{formErrors[`field_${index}_name`]}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Type</Label>
-                          <Select 
-                            value={field.type} 
-                            onValueChange={(value) => updateField(index, { ...field, type: value })}
-                          >
-                            <SelectTrigger className={formErrors[`field_${index}_type`] ? "border-red-500" : ""}>
-                              <SelectValue placeholder="Select type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="string">String</SelectItem>
-                              <SelectItem value="number">Number</SelectItem>
-                              <SelectItem value="boolean">Boolean</SelectItem>
-                              <SelectItem value="date">Date</SelectItem>
-                              <SelectItem value="datetime">DateTime</SelectItem>
-                              <SelectItem value="text">Text</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {formErrors[`field_${index}_type`] && (
-                            <p className="text-sm text-red-600">{formErrors[`field_${index}_type`]}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Primary Key</Label>
-                          <Select 
-                            value={field.isPrimaryKey ? "true" : "false"} 
-                            onValueChange={(value) => updateField(index, { ...field, isPrimaryKey: value === "true" })}
-                          >
-                            <SelectTrigger className={formErrors[`field_${index}_primary`] ? "border-red-500" : ""}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="false">No</SelectItem>
-                              <SelectItem value="true">Yes</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          {formErrors[`field_${index}_primary`] && (
-                            <p className="text-sm text-red-600">{formErrors[`field_${index}_primary`]}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Description</Label>
-                        <Input
-                          value={field.description}
-                          onChange={(e) => updateField(index, { ...field, description: e.target.value })}
-                          placeholder="Field description"
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+
 
             {/* Advanced Configuration */}
             <div className="space-y-4">
@@ -1213,19 +1366,119 @@ const Tables = () => {
                   <Label htmlFor="tenant-id">Tenant ID</Label>
                   <Input
                     id="tenant-id"
-                    value={createFormData.tenant_id}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, tenant_id: e.target.value }))}
+                    value={createFormData.tenantId}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, tenantId: e.target.value }))}
                     placeholder="Enter tenant ID"
                   />
                 </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="module-trigger-id">Module Trigger ID</Label>
+                  <Label htmlFor="primary-key">Primary Key</Label>
                   <Input
-                    id="module-trigger-id"
-                    value={createFormData.module_trigger_id}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, module_trigger_id: e.target.value }))}
-                    placeholder="Enter module trigger ID"
+                    id="primary-key"
+                    value={createFormData.primaryKey?.join(', ') || ''}
+                    onChange={(e) => setCreateFormData(prev => ({ 
+                      ...prev, 
+                      primaryKey: e.target.value.split(',').map(k => k.trim()).filter(k => k) 
+                    }))}
+                    placeholder="Enter primary keys (comma separated)"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="object-key">Object Key</Label>
+                  <Input
+                    id="object-key"
+                    value={createFormData.objectKey}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, objectKey: e.target.value }))}
+                    placeholder="Enter object key"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="sequence-key">Sequence Key</Label>
+                  <Input
+                    id="sequence-key"
+                    value={createFormData.sequenceKey}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, sequenceKey: e.target.value }))}
+                    placeholder="Enter sequence key"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="parent-name">Parent Name</Label>
+                  <Input
+                    id="parent-name"
+                    value={createFormData.parentName}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, parentName: e.target.value }))}
+                    placeholder="Enter parent name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="label">Label</Label>
+                  <Input
+                    id="label"
+                    value={createFormData.label}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, label: e.target.value }))}
+                    placeholder="Enter label"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="audit-column">Audit Column</Label>
+                  <Input
+                    id="audit-column"
+                    value={createFormData.auditColumn}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, auditColumn: e.target.value }))}
+                    placeholder="Enter audit column"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ignored-columns">Ignored Columns</Label>
+                  <Input
+                    id="ignored-columns"
+                    value={createFormData.ignoredColumns?.join(', ') || ''}
+                    onChange={(e) => setCreateFormData(prev => ({ 
+                      ...prev, 
+                      ignoredColumns: e.target.value.split(',').map(c => c.trim()).filter(c => c) 
+                    }))}
+                    placeholder="Enter ignored columns (comma separated)"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="data-source-id">Data Source ID</Label>
+                  <Input
+                    id="data-source-id"
+                    value={createFormData.dataSourceId}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, dataSourceId: e.target.value }))}
+                    placeholder="Enter data source ID"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="is-list">Is List</Label>
+                  <Select 
+                    value={createFormData.isList ? 'true' : 'false'} 
+                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, isList: value === 'true' }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select list status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="triggered">Triggered</Label>
+                  <Select 
+                    value={createFormData.triggered ? 'true' : 'false'} 
+                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, triggered: value === 'true' }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select trigger status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">No</SelectItem>
+                      <SelectItem value="true">Yes</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

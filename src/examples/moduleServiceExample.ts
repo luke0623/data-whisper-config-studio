@@ -15,7 +15,7 @@ export async function getAllModulesExample() {
     const params: ModulePaginationParams = {
       page: 1,
       limit: 10,
-      sortBy: 'created_at',
+      sortBy: 'createdAt',
       sortOrder: 'desc',
       search: '数据处理'
     };
@@ -58,11 +58,11 @@ export async function getModuleByIdExample(moduleId: string) {
 export async function createModuleExample() {
   try {
     const newModule: CreateModuleRequest = {
-      module_name: '数据处理模块',
+      moduleName: '数据处理模块',
       priority: 1,
       version: '1.0.0',
-      tenant_id: 'tenant_001',
-      created_by: 'admin'
+      tenantId: 'tenant_001',
+      createdBy: 'admin'
     };
 
     const createdModule = await moduleService.createModule(newModule);
@@ -82,10 +82,10 @@ export async function createModuleExample() {
 export async function updateModuleExample(moduleId: string) {
   try {
     const updateData: UpdateModuleRequest = {
-      module_name: '数据处理模块 v2',
+      moduleName: '数据处理模块 v2',
       priority: 2,
       version: '2.0.0',
-      last_modified_by: 'admin'
+      lastModifiedBy: 'admin'
     };
 
     const updatedModule = await moduleService.updateModule(moduleId, updateData);
@@ -144,7 +144,7 @@ export async function searchModulesExample(searchTerm: string) {
     const params: ModulePaginationParams = {
       page: 1,
       limit: 20,
-      tenant_id: 'tenant_001'
+      tenantId: 'tenant_001'
     };
 
     const result = await moduleService.searchModules(searchTerm, params);
@@ -190,15 +190,15 @@ export async function batchUpdateModulesExample() {
         moduleId: 'module_001',
         data: {
           priority: 3,
-          last_modified_by: 'admin'
+          lastModifiedBy: 'admin'
         }
       },
       {
         moduleId: 'module_002',
         data: {
-          module_name: '更新的模块名称',
+          moduleName: '更新的模块名称',
           version: '1.1.0',
-          last_modified_by: 'admin'
+          lastModifiedBy: 'admin'
         }
       }
     ];
@@ -233,11 +233,11 @@ export async function completeWorkflowExample() {
     
     // 3. 获取模块详情
     console.log('\n3. 获取模块详情...');
-    await getModuleByIdExample(newModule.module_id);
+    await getModuleByIdExample(newModule.moduleId);
     
     // 4. 更新模块
     console.log('\n4. 更新模块...');
-    await updateModuleExample(newModule.module_id);
+    await updateModuleExample(newModule.moduleId);
     
     // 5. 搜索模块
     console.log('\n5. 搜索模块...');

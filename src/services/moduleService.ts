@@ -7,412 +7,491 @@ import {
   ModuleStats,
   BatchOperationResult
 } from '../models/module';
+import { API_BASE_URL } from '../utils/apiConfig';
+import { authService } from './authService';
 
 /**
- * API响应接口
+ * Mock data for development and testing
  */
-interface ApiResponse<T> {
-  success: boolean;
-  data: T;
-  message?: string;
-  error?: string;
-}
+const mockModules: Module[] = [
+  {
+    moduleId: 'policy_mgmt_001',
+    moduleName: 'Policy Management',
+    priority: 1,
+    version: '1.0.0',
+    tenantId: 'tenant_001',
+    createdAt: '2024-01-15T10:00:00Z',
+    createdBy: 'admin',
+    lastModifiedAt: '2024-01-15T10:00:00Z',
+    lastModifiedBy: 'admin'
+  },
+  {
+    moduleId: 'claims_001',
+    moduleName: 'Claims',
+    priority: 2,
+    version: '1.0.0',
+    tenantId: 'tenant_001',
+    createdAt: '2024-01-15T10:00:00Z',
+    createdBy: 'admin',
+    lastModifiedAt: '2024-01-15T10:00:00Z',
+    lastModifiedBy: 'admin'
+  },
+  {
+    moduleId: 'billing_001',
+    moduleName: 'Billing System',
+    priority: 3,
+    version: '1.2.0',
+    tenantId: 'tenant_001',
+    createdAt: '2024-01-10T08:00:00Z',
+    createdBy: 'admin',
+    lastModifiedAt: '2024-01-20T14:30:00Z',
+    lastModifiedBy: 'admin'
+  },
+  {
+    moduleId: 'reporting_001',
+    moduleName: 'Reporting Module',
+    priority: 4,
+    version: '2.1.0',
+    tenantId: 'tenant_002',
+    createdAt: '2024-01-05T12:00:00Z',
+    createdBy: 'user1',
+    lastModifiedAt: '2024-01-18T16:45:00Z',
+    lastModifiedBy: 'user1'
+  }
+];
+
+const mockModuleStats: ModuleStats = {
+  total: 4,
+  byTenant: {
+    'tenant_001': 3,
+    'tenant_002': 1
+  },
+  byVersion: {
+    '1.0.0': 2,
+    '1.2.0': 1,
+    '2.1.0': 1
+  },
+  byPriority: {
+    1: 1,
+    2: 1,
+    3: 1,
+    4: 1
+  },
+  recentlyCreated: 4,
+  recentlyModified: 4
+};
 
 /**
- * 模块服务错误类
+ * Custom Error Class for Module Service
  */
 export class ModuleServiceError extends Error {
-  public readonly statusCode: number;
-  public readonly code: string;
-
-  constructor(message: string, statusCode: number = 500, code: string = 'MODULE_SERVICE_ERROR') {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public originalError?: Error
+  ) {
     super(message);
     this.name = 'ModuleServiceError';
-    this.statusCode = statusCode;
-    this.code = code;
   }
 }
+
+export const getDefaultHeaders = () => {
+  // Get token from logged-in user via authService
+  const token = authService.getStoredToken();
+ 
+  return {
+    'Content-Type': 'application/json',
+    'Accept': '*/*',
+    'Authorization': `Bearer ${token}`,
+  };
+};
 
 /**
- * 模块服务类 - 提供完整的CRUD功能
+ * Module Service Class
+ * Following the tableService.ts pattern
  */
 export class ModuleService {
-  private readonly baseUrl: string;
-  private readonly defaultHeaders: Record<string, string>;
+  private useMockData: boolean;
 
-  constructor(baseUrl: string = '/api/modules') {
-    this.baseUrl = baseUrl;
-    this.defaultHeaders = {
-      'Content-Type': 'application/json',
-    };
+  constructor(useMockData: boolean = false) {
+    this.useMockData = useMockData;
   }
 
   /**
-   * 通用HTTP请求方法
+   * Get all modules (matches server endpoint: /ingest/config/module/all)
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
-    const config: RequestInit = {
-      ...options,
-      headers: {
-        ...this.defaultHeaders,
-        ...options.headers,
-      },
-    };
+  async getAllModules(): Promise<Module[]> {
+    if (this.useMockData) {
+      return mockModules;
+    }
 
     try {
-      const response = await fetch(url, config);
-      
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/module/all`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
         throw new ModuleServiceError(
-          errorData.message || `HTTP ${response.status}: ${response.statusText}`,
-          response.status,
-          errorData.code || 'HTTP_ERROR'
+          `Failed to fetch modules: ${response.status} ${response.statusText}`,
+          response.status
         );
       }
-
-      const data: ApiResponse<T> = await response.json();
       
-      if (!data.success) {
-        throw new ModuleServiceError(
-          data.error || data.message || '请求失败',
-          500,
-          'API_ERROR'
-        );
-      }
-
-      return data.data;
+      const moduleList: Module[] = await response.json();
+      return moduleList;
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+      console.error('Error fetching modules:', error);
+      // Fallback to mock data if enabled
+      if (this.useMockData) {
+        return mockModules;
       }
-      
-      // 网络错误或其他未知错误
       throw new ModuleServiceError(
-        error instanceof Error ? error.message : '网络请求失败',
-        0,
-        'NETWORK_ERROR'
+        'Failed to fetch modules',
+        undefined,
+        error instanceof Error ? error : new Error(String(error))
       );
     }
   }
 
   /**
-   * GET请求方法
+   * Get all modules with pagination (for backward compatibility)
    */
-  private async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
-    const url = new URL(`${this.baseUrl}${endpoint}`, window.location.origin);
+  async getAllModulesWithPagination(params: ModulePaginationParams = {}): Promise<PaginatedModuleResponse> {
+    const allModules = await this.getAllModules();
     
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          url.searchParams.append(key, String(value));
-        }
+    // Apply client-side filtering and pagination
+    let filteredModules = allModules;
+    
+    // Apply search filter
+    if (params.search) {
+      const searchLower = params.search.toLowerCase();
+      filteredModules = filteredModules.filter(module => 
+        (module.moduleName || '').toLowerCase().includes(searchLower) ||
+        (module.version || '').toLowerCase().includes(searchLower) ||
+        (module.tenantId || '').toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Apply tenant filter
+    if (params.tenantId) {
+      filteredModules = filteredModules.filter(module => module.tenantId === params.tenantId);
+    }
+    
+    // Apply sorting
+    if (params.sortBy) {
+      filteredModules.sort((a, b) => {
+        const aValue = a[params.sortBy as keyof Module];
+        const bValue = b[params.sortBy as keyof Module];
+        
+        if (aValue < bValue) return params.sortOrder === 'desc' ? 1 : -1;
+        if (aValue > bValue) return params.sortOrder === 'desc' ? -1 : 1;
+        return 0;
       });
     }
-
-    return this.request<T>(url.pathname + url.search, {
-      method: 'GET',
-    });
-  }
-
-  /**
-   * POST请求方法
-   */
-  private async post<T>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'POST',
-      body: data ? JSON.stringify(data) : undefined,
-    });
-  }
-
-  /**
-   * PUT请求方法
-   */
-  private async put<T>(endpoint: string, data?: any): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: data ? JSON.stringify(data) : undefined,
-    });
-  }
-
-  /**
-   * DELETE请求方法
-   */
-  private async delete<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'DELETE',
-    });
-  }
-
-  /**
-   * 数据验证方法
-   */
-  private validateCreateModuleRequest(data: CreateModuleRequest): void {
-    if (!data.module_name?.trim()) {
-      throw new ModuleServiceError('模块名称不能为空', 400, 'VALIDATION_ERROR');
-    }
     
-    if (data.priority < 0) {
-      throw new ModuleServiceError('优先级不能为负数', 400, 'VALIDATION_ERROR');
-    }
+    // Apply pagination
+    const { page = 1, limit = 10 } = params;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const data = filteredModules.slice(startIndex, endIndex);
     
-    if (!data.version?.trim()) {
-      throw new ModuleServiceError('版本号不能为空', 400, 'VALIDATION_ERROR');
-    }
-    
-    if (!data.tenant_id?.trim()) {
-      throw new ModuleServiceError('租户ID不能为空', 400, 'VALIDATION_ERROR');
-    }
-    
-    if (!data.created_by?.trim()) {
-      throw new ModuleServiceError('创建者不能为空', 400, 'VALIDATION_ERROR');
-    }
-  }
-
-  private validateUpdateModuleRequest(data: UpdateModuleRequest): void {
-    if (data.module_name !== undefined && !data.module_name?.trim()) {
-      throw new ModuleServiceError('模块名称不能为空', 400, 'VALIDATION_ERROR');
-    }
-    
-    if (data.priority !== undefined && data.priority < 0) {
-      throw new ModuleServiceError('优先级不能为负数', 400, 'VALIDATION_ERROR');
-    }
-    
-    if (data.version !== undefined && !data.version?.trim()) {
-      throw new ModuleServiceError('版本号不能为空', 400, 'VALIDATION_ERROR');
-    }
-    
-    if (!data.last_modified_by?.trim()) {
-      throw new ModuleServiceError('修改者不能为空', 400, 'VALIDATION_ERROR');
-    }
-  }
-
-  /**
-   * 获取所有模块（支持分页和搜索）
-   */
-  async getAllModules(params: ModulePaginationParams = {}): Promise<PaginatedModuleResponse> {
-    try {
-      const queryParams = {
-        page: params.page || 1,
-        limit: params.limit || 10,
-        sortBy: params.sortBy || 'created_at',
-        sortOrder: params.sortOrder || 'desc',
-        ...params
-      };
-
-      return await this.get<PaginatedModuleResponse>('', queryParams);
-    } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: filteredModules.length,
+        totalPages: Math.ceil(filteredModules.length / limit),
+        hasNext: page < Math.ceil(filteredModules.length / limit),
+        hasPrev: page > 1
       }
-      throw new ModuleServiceError(
-        '获取模块列表失败',
-        500,
-        'GET_MODULES_ERROR'
-      );
-    }
+    };
   }
 
   /**
-   * 根据ID获取单个模块
+   * Get module by ID
    */
   async getModuleById(moduleId: string): Promise<Module> {
-    if (!moduleId?.trim()) {
-      throw new ModuleServiceError('模块ID不能为空', 400, 'VALIDATION_ERROR');
+    if (this.useMockData) {
+      const module = mockModules.find(m => m.moduleId === moduleId);
+      if (!module) throw new Error('Module not found');
+      return module;
     }
 
     try {
-      return await this.get<Module>(`/${moduleId}`);
+      const response = await fetch(`${API_BASE_URL}/modules/${moduleId}`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch module details');
+      return await response.json();
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+      console.error('Error fetching module details:', error);
+      if (this.useMockData) {
+        const module = mockModules.find(m => m.moduleId === moduleId);
+        if (!module) throw new Error('Module not found');
+        return module;
       }
-      throw new ModuleServiceError(
-        `获取模块 ${moduleId} 失败`,
-        500,
-        'GET_MODULE_ERROR'
-      );
+      throw error;
     }
   }
 
   /**
-   * 创建新模块
+   * Create new module
    */
   async createModule(moduleData: CreateModuleRequest): Promise<Module> {
-    this.validateCreateModuleRequest(moduleData);
+    if (this.useMockData) {
+       const newModule: Module = {
+         ...moduleData,
+         moduleId: (mockModules.length + 1).toString(),
+         lastModifiedAt: new Date().toISOString(),
+         lastModifiedBy: moduleData.createdBy || 'system',
+         createdAt: new Date().toISOString()
+       };
+       mockModules.push(newModule);
+       return newModule;
+     }
 
     try {
-      return await this.post<Module>('', moduleData);
+      const response = await fetch(`${API_BASE_URL}/modules`, {
+        method: 'POST',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify(moduleData),
+      });
+      if (!response.ok) throw new Error('Failed to create module');
+      return await response.json();
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
-      }
-      throw new ModuleServiceError(
-        '创建模块失败',
-        500,
-        'CREATE_MODULE_ERROR'
-      );
+      console.error('Error creating module:', error);
+      if (this.useMockData) {
+         const newModule: Module = {
+           ...moduleData,
+           moduleId: (mockModules.length + 1).toString(),
+           lastModifiedAt: new Date().toISOString(),
+           lastModifiedBy: moduleData.createdBy || 'system',
+           createdAt: new Date().toISOString()
+         };
+         mockModules.push(newModule);
+         return newModule;
+       }
+      throw error;
     }
   }
 
   /**
-   * 更新模块
+   * Update module
    */
-  async updateModule(moduleId: string, moduleData: UpdateModuleRequest): Promise<Module> {
-    if (!moduleId?.trim()) {
-      throw new ModuleServiceError('模块ID不能为空', 400, 'VALIDATION_ERROR');
+  async updateModule(moduleId: string, updateData: UpdateModuleRequest): Promise<Module> {
+    if (this.useMockData) {
+      const moduleIndex = mockModules.findIndex(m => m.moduleId === moduleId);
+      if (moduleIndex === -1) throw new Error('Module not found');
+      
+      mockModules[moduleIndex] = {
+        ...mockModules[moduleIndex],
+        ...updateData,
+        lastModifiedAt: new Date().toISOString()
+      };
+      return mockModules[moduleIndex];
     }
 
-    this.validateUpdateModuleRequest(moduleData);
-
     try {
-      return await this.put<Module>(`/${moduleId}`, moduleData);
+      const response = await fetch(`${API_BASE_URL}/modules/${moduleId}`, {
+        method: 'PUT',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify(updateData),
+      });
+      if (!response.ok) throw new Error('Failed to update module');
+      return await response.json();
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+      console.error('Error updating module:', error);
+      if (this.useMockData) {
+        const moduleIndex = mockModules.findIndex(m => m.moduleId === moduleId);
+        if (moduleIndex === -1) throw new Error('Module not found');
+        
+        mockModules[moduleIndex] = {
+          ...mockModules[moduleIndex],
+          ...updateData,
+          lastModifiedAt: new Date().toISOString()
+        };
+        return mockModules[moduleIndex];
       }
-      throw new ModuleServiceError(
-        `更新模块 ${moduleId} 失败`,
-        500,
-        'UPDATE_MODULE_ERROR'
-      );
+      throw error;
     }
   }
 
   /**
-   * 删除单个模块
+   * Delete module
    */
   async deleteModule(moduleId: string): Promise<void> {
-    if (!moduleId?.trim()) {
-      throw new ModuleServiceError('模块ID不能为空', 400, 'VALIDATION_ERROR');
+    if (this.useMockData) {
+      const moduleIndex = mockModules.findIndex(m => m.moduleId === moduleId);
+      if (moduleIndex === -1) throw new Error('Module not found');
+      mockModules.splice(moduleIndex, 1);
+      return;
     }
 
     try {
-      await this.delete<void>(`/${moduleId}`);
+      const response = await fetch(`${API_BASE_URL}/modules/${moduleId}`, {
+        method: 'DELETE',
+        headers: getDefaultHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to delete module');
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+      console.error('Error deleting module:', error);
+      if (this.useMockData) {
+        const moduleIndex = mockModules.findIndex(m => m.moduleId === moduleId);
+        if (moduleIndex === -1) throw new Error('Module not found');
+        mockModules.splice(moduleIndex, 1);
+        return;
       }
-      throw new ModuleServiceError(
-        `删除模块 ${moduleId} 失败`,
-        500,
-        'DELETE_MODULE_ERROR'
-      );
+      throw error;
     }
   }
 
   /**
-   * 批量删除模块
+   * Delete multiple modules
    */
   async deleteModules(moduleIds: string[]): Promise<BatchOperationResult> {
-    if (!moduleIds || moduleIds.length === 0) {
-      throw new ModuleServiceError('模块ID列表不能为空', 400, 'VALIDATION_ERROR');
-    }
-
-    // 验证所有ID都不为空
-    const invalidIds = moduleIds.filter(id => !id?.trim());
-    if (invalidIds.length > 0) {
-      throw new ModuleServiceError('模块ID不能为空', 400, 'VALIDATION_ERROR');
+    if (this.useMockData) {
+      const success: string[] = [];
+      const failed: Array<{ id: string; error: string }> = [];
+      
+      moduleIds.forEach(id => {
+        const moduleIndex = mockModules.findIndex(m => m.moduleId === id);
+        if (moduleIndex !== -1) {
+          mockModules.splice(moduleIndex, 1);
+          success.push(id);
+        } else {
+          failed.push({ id, error: 'Module not found' });
+        }
+      });
+      
+      return {
+        success,
+        failed,
+        total: moduleIds.length,
+        successCount: success.length,
+        failedCount: failed.length
+      };
     }
 
     try {
-      return await this.post<BatchOperationResult>('/batch-delete', { moduleIds });
+      const response = await fetch(`${API_BASE_URL}/modules/batch`, {
+        method: 'DELETE',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify({ ids: moduleIds }),
+      });
+      if (!response.ok) throw new Error('Failed to delete modules');
+      return await response.json();
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+      console.error('Error deleting modules:', error);
+      if (this.useMockData) {
+        const success: string[] = [];
+        const failed: Array<{ id: string; error: string }> = [];
+        
+        moduleIds.forEach(id => {
+          const moduleIndex = mockModules.findIndex(m => m.moduleId === id);
+          if (moduleIndex !== -1) {
+            mockModules.splice(moduleIndex, 1);
+            success.push(id);
+          } else {
+            failed.push({ id, error: 'Module not found' });
+          }
+        });
+        
+        return {
+          success,
+          failed,
+          total: moduleIds.length,
+          successCount: success.length,
+          failedCount: failed.length
+        };
       }
-      throw new ModuleServiceError(
-        '批量删除模块失败',
-        500,
-        'BATCH_DELETE_ERROR'
-      );
+      throw error;
     }
   }
 
   /**
-   * 获取模块统计信息
+   * Get modules by tenant ID
+   */
+  async getModulesByTenantId(tenantId: string): Promise<Module[]> {
+    if (this.useMockData) {
+      return mockModules.filter(module => module.tenantId === tenantId);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/modules/tenant/${tenantId}`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch modules by tenant');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching modules by tenant:', error);
+      if (this.useMockData) {
+        return mockModules.filter(module => module.tenantId === tenantId);
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get module statistics
    */
   async getModuleStats(): Promise<ModuleStats> {
+    if (this.useMockData) {
+      return mockModuleStats;
+    }
+
     try {
-      return await this.get<ModuleStats>('/stats');
+      const response = await fetch(`${API_BASE_URL}/modules/stats`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      if (!response.ok) throw new Error('Failed to fetch module statistics');
+      return await response.json();
     } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
+      console.error('Error fetching module statistics:', error);
+      if (this.useMockData) {
+        return mockModuleStats;
       }
-      throw new ModuleServiceError(
-        '获取模块统计信息失败',
-        500,
-        'GET_STATS_ERROR'
-      );
+      throw error;
     }
   }
 
   /**
-   * 搜索模块
+   * Set mock data mode
    */
-  async searchModules(searchTerm: string, params: ModulePaginationParams = {}): Promise<PaginatedModuleResponse> {
-    if (!searchTerm?.trim()) {
-      throw new ModuleServiceError('搜索关键词不能为空', 400, 'VALIDATION_ERROR');
-    }
-
-    try {
-      const queryParams = {
-        search: searchTerm,
-        page: params.page || 1,
-        limit: params.limit || 10,
-        sortBy: params.sortBy || 'created_at',
-        sortOrder: params.sortOrder || 'desc',
-        ...params
-      };
-
-      return await this.get<PaginatedModuleResponse>('/search', queryParams);
-    } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
-      }
-      throw new ModuleServiceError(
-        '搜索模块失败',
-        500,
-        'SEARCH_MODULES_ERROR'
-      );
-    }
+  setMockDataMode(useMockData: boolean): void {
+    this.useMockData = useMockData;
   }
 
   /**
-   * 批量更新模块
+   * Get current mock data mode
    */
-  async updateModules(updates: Array<{ moduleId: string; data: UpdateModuleRequest }>): Promise<BatchOperationResult> {
-    if (!updates || updates.length === 0) {
-      throw new ModuleServiceError('更新数据不能为空', 400, 'VALIDATION_ERROR');
+  getMockDataMode(): boolean {
+    return this.useMockData;
+  }
+
+  /**
+   * Health check
+   */
+  async healthCheck(): Promise<boolean> {
+    if (this.useMockData) {
+      return true;
     }
 
-    // 验证每个更新请求
-    updates.forEach((update, index) => {
-      if (!update.moduleId?.trim()) {
-        throw new ModuleServiceError(`第${index + 1}个更新请求的模块ID不能为空`, 400, 'VALIDATION_ERROR');
-      }
-      this.validateUpdateModuleRequest(update.data);
-    });
-
     try {
-      return await this.post<BatchOperationResult>('/batch-update', { updates });
-    } catch (error) {
-      if (error instanceof ModuleServiceError) {
-        throw error;
-      }
-      throw new ModuleServiceError(
-        '批量更新模块失败',
-        500,
-        'BATCH_UPDATE_ERROR'
-      );
+      const response = await fetch(`${API_BASE_URL}/modules/health`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      return response.ok;
+    } catch {
+      return false;
     }
   }
 }
 
-// 创建并导出模块服务实例
+// Create and export module service instance
 export const moduleService = new ModuleService();

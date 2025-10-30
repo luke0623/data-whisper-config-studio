@@ -1,41 +1,135 @@
 import { 
-  TableDetailConfig, 
+  CollectorTableConfig,
   TableStatus, 
   CreateTableRequest, 
   UpdateTableRequest, 
   TableFilterParams, 
-  PaginatedTableResponse 
+  PaginatedTableResponse,
+  Condition,
+  JoinCondition,
+  Dependence,
+  JsonColumn,
+  constructConditions,
+  constructJoinConditions,
+  constructDependencies,
+  constructJsonColumns
 } from '../models/table';
+import { API_BASE_URL } from '../utils/apiConfig';
+import { authService } from './authService';
 
 /**
- * API 响应接口
+ * Mock data for development and testing
+ * Updated to match CollectorTableConfig structure
  */
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
-}
+const mockCollectorConfigs: CollectorTableConfig[] = [
+  {
+    configId: '1',
+    name: 'users',
+    tableName: 'users_table',
+    primaryKey: ['id'],
+    objectKey: 'user_id',
+    sequenceKey: 'sequence_id',
+    modelName: 'UserModel',
+    parentName: 'BaseModel',
+    label: 'User Management',
+    joinKeys: [
+      {
+        parentKey: { field: 'parent_id', operator: '=', value: null, type: 'string' },
+        childKey: { field: 'child_id', operator: '=', value: null, type: 'string' }
+      }
+    ],
+    dependOn: [
+      { modelName: 'BaseModel', objectKey: 'base_id' }
+    ],
+    conditions: [
+      { field: 'status', operator: '=', value: 'active', type: 'string' }
+    ],
+    jsonColumns: [
+      {
+        columnName: 'metadata',
+        ignoredPath: ['temp'],
+        needFlatten: true,
+        flattenPath: ['data'],
+        jsonPath: ['$.data']
+      }
+    ],
+    auditColumn: 'audit_log',
+    ignoredColumns: ['temp_column'],
+    dataSourceId: 'ds-1',
+    isList: false,
+    triggered: true,
+    tenantId: 'tenant-1',
+    createdAt: '2024-01-01T00:00:00Z',
+    createdBy: 'admin',
+    lastModifiedAt: '2024-01-15T10:30:00Z',
+    lastModifiedBy: 'admin',
+    version: 1
+  },
+  {
+    configId: '2',
+    name: 'products',
+    tableName: 'products_table',
+    primaryKey: ['id', 'sku'],
+    objectKey: 'product_id',
+    sequenceKey: 'product_seq',
+    modelName: 'ProductModel',
+    parentName: 'CatalogModel',
+    label: 'Product Catalog',
+    joinKeys: [
+      {
+        parentKey: { field: 'category_id', operator: '=', value: null, type: 'integer' },
+        childKey: { field: 'product_category_id', operator: '=', value: null, type: 'integer' }
+      }
+    ],
+    dependOn: [
+      { modelName: 'CategoryModel', objectKey: 'category_id' },
+      { modelName: 'InventoryModel', objectKey: 'inventory_id' }
+    ],
+    conditions: [
+      { field: 'is_active', operator: '=', value: true, type: 'boolean' },
+      { field: 'price', operator: '>', value: 0, type: 'decimal' }
+    ],
+    jsonColumns: [
+      {
+        columnName: 'specifications',
+        ignoredPath: ['internal'],
+        needFlatten: false,
+        flattenPath: [],
+        jsonPath: ['$.specs']
+      }
+    ],
+    auditColumn: 'product_audit',
+    ignoredColumns: ['internal_notes'],
+    dataSourceId: 'ds-2',
+    isList: true,
+    triggered: false,
+    tenantId: 'tenant-1',
+    createdAt: '2024-01-02T00:00:00Z',
+    createdBy: 'admin',
+    lastModifiedAt: '2024-01-14T15:45:00Z',
+    lastModifiedBy: 'admin',
+    version: 2
+  }
+];
+
+// Use CollectorTableConfig directly
+const mockTables: CollectorTableConfig[] = mockCollectorConfigs;
+
+const mockTableStats = {
+  total: 2,
+  active: 2,
+  inactive: 0,
+  pending: 0,
+  bySchema: {
+    'public': 1,
+    'inventory': 1
+  }
+};
 
 /**
- * 分页查询参数
+ * Custom Error Class for Table Service
  */
-interface TablePaginationParams {
-  page?: number;
-  limit?: number;
-  sortBy?: keyof TableDetailConfig;
-  sortOrder?: 'asc' | 'desc';
-  search?: string;
-  status?: TableStatus | 'all';
-  schema?: string;
-  tenant_id?: string;
-  module_trigger_id?: string;
-}
-
-/**
- * 自定义错误类
- */
-class TableServiceError extends Error {
+export class TableServiceError extends Error {
   constructor(
     message: string,
     public statusCode?: number,
@@ -46,249 +140,369 @@ class TableServiceError extends Error {
   }
 }
 
+export const getDefaultHeaders = () => {
+  // const headers = {
+  //   'Content-Type': 'application/json',
+  // };
+
+  // Get token from logged-in user via authService
+  const token = authService.getStoredToken();
+ 
+    // headers["Authorization"] = `Bearer ${token}`;
+  // headers["Authorization"] = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjI0NDMxNzQsInN1YiI6Im1ldHJpY3NfYWRtaW4ifQ.U4-V2kTBBeW9dCEaCUWHhcyuuldy5EZYMrNJuhtaNCE";
+  
+  return {
+          'Content-Type': 'application/json',
+          'Accept': '*/*',
+          'Authorization': `Bearer ${token}`,
+        }
+
+};
+
 /**
- * Table 数据访问服务类
- * 使用原生 fetch API 实现完整的 CRUD 操作
+ * Table Service Class
+ * Simplified implementation following the provided code example pattern
  */
 export class TableService {
-  private readonly baseUrl: string;
-  private readonly defaultHeaders: HeadersInit;
+  private useMockData: boolean;
 
-  constructor(baseUrl: string = '/api/tables') {
-    this.baseUrl = baseUrl;
-    this.defaultHeaders = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
+  constructor(useMockData: boolean = false) {
+    this.useMockData = useMockData;
   }
 
   /**
-   * 通用的 HTTP 请求方法
+   * Get all tables (matches server endpoint: /collector/config/table/all)
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const url = `${this.baseUrl}${endpoint}`;
-    
+  async getAllTables(): Promise<CollectorTableConfig[]> {
+    if (this.useMockData) {
+      return mockTables;
+    }
+
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...this.defaultHeaders,
-          ...options.headers,
-        },
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/table/all`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
       });
 
-      // 检查 HTTP 状态码
       if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch {
-          // 如果不是 JSON 格式，使用原始错误文本
-          errorMessage = errorText || errorMessage;
-        }
-
-        throw new TableServiceError(errorMessage, response.status);
-      }
-
-      // 解析响应数据
-      const data = await response.json();
-      return data;
-    } catch (error) {
-      if (error instanceof TableServiceError) {
-        throw error;
+        throw new TableServiceError(
+          `Failed to fetch tables: ${response.status} ${response.statusText}`,
+          response.status
+        );
       }
       
-      // 网络错误或其他错误
+      const tableConfigList: CollectorTableConfig[] = await response.json();
+      return tableConfigList;
+    } catch (error) {
+      console.error('Error fetching tables:', error);
+      // Fallback to mock data if enabled
+      if (this.useMockData) {
+        return mockTables;
+      }
       throw new TableServiceError(
-        `Request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'Failed to fetch tables',
         undefined,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : new Error(String(error))
       );
     }
   }
 
   /**
-   * 获取所有表格（支持分页、搜索和过滤）
+   * Get all tables with pagination (for backward compatibility)
    */
-  async getAllTables(params: TablePaginationParams = {}): Promise<PaginatedTableResponse> {
-    const queryParams = new URLSearchParams();
+  async getAllTablesWithPagination(params: TableFilterParams = {}): Promise<PaginatedTableResponse> {
+    const allTables = await this.getAllTables();
     
-    // 添加查询参数
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
-    if (params.search) queryParams.append('search', params.search);
-    if (params.status && params.status !== 'all') queryParams.append('status', params.status);
-    if (params.schema) queryParams.append('schema', params.schema);
-    if (params.tenant_id) queryParams.append('tenant_id', params.tenant_id);
-    if (params.module_trigger_id) queryParams.append('module_trigger_id', params.module_trigger_id);
-
-    const endpoint = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    const response = await this.request<PaginatedTableResponse>(endpoint);
+    // Apply client-side filtering and pagination
+    let filteredTables = allTables;
     
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to fetch tables');
+    // Apply search filter
+    if (params.search) {
+      const searchLower = params.search.toLowerCase();
+      filteredTables = filteredTables.filter(table => 
+        (table.name || '').toLowerCase().includes(searchLower) ||
+        (table.label || '').toLowerCase().includes(searchLower) ||
+        (table.tableName || '').toLowerCase().includes(searchLower)
+      );
     }
-
-    return response.data;
-  }
-
-  /**
-   * 根据 ID 获取单个表格详情
-   */
-  async getTableById(tableId: string): Promise<TableDetailConfig> {
-    if (!tableId) {
-      throw new TableServiceError('Table ID is required');
-    }
-
-    const response = await this.request<TableDetailConfig>(`/${tableId}`);
     
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to fetch table details');
+    // Apply status filter - CollectorTableConfig doesn't have status, so we skip this
+    // if (params.status && params.status !== 'all') {
+    //   filteredTables = filteredTables.filter(table => table.status === params.status);
+    // }
+    
+    // Apply schema filter - using modelName as schema equivalent
+    if (params.schema) {
+      filteredTables = filteredTables.filter(table => table.modelName === params.schema);
     }
-
-    return response.data;
+    
+    // Apply sorting
+    if (params.sortBy) {
+      filteredTables.sort((a, b) => {
+        const aValue = a[params.sortBy as keyof CollectorTableConfig];
+        const bValue = b[params.sortBy as keyof CollectorTableConfig];
+        
+        if (aValue < bValue) return params.sortOrder === 'desc' ? 1 : -1;
+        if (aValue > bValue) return params.sortOrder === 'desc' ? -1 : 1;
+        return 0;
+      });
+    }
+    
+    // Apply pagination
+    const { page = 1, limit = 10 } = params;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const items = filteredTables.slice(startIndex, endIndex);
+    
+    return {
+      items,
+      total: filteredTables.length,
+      page,
+      limit,
+      totalPages: Math.ceil(filteredTables.length / limit)
+    };
   }
 
   /**
-   * 创建新表格
+   * Get table by ID (using configId)
    */
-  async createTable(tableData: CreateTableRequest): Promise<TableDetailConfig> {
-    // 验证必填字段
-    this.validateTableData(tableData);
-
-    const response = await this.request<TableDetailConfig>('', {
-      method: 'POST',
-      body: JSON.stringify(tableData),
-    });
-
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to create table');
+  async getTableById(tableId: string): Promise<CollectorTableConfig> {
+    if (this.useMockData) {
+      const table = mockTables.find(t => t.configId === tableId);
+      if (!table) throw new Error('Table not found');
+      return table;
     }
 
-    return response.data;
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${tableId}`);
+      if (!response.ok) throw new Error('Failed to fetch table details');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching table details:', error);
+      if (this.useMockData) {
+        const table = mockTables.find(t => t.configId === tableId);
+        if (!table) throw new Error('Table not found');
+        return table;
+      }
+      throw error;
+    }
   }
 
   /**
-   * 更新表格配置
+   * Create new table
    */
-  async updateTable(tableId: string, updateData: UpdateTableRequest): Promise<TableDetailConfig> {
-    if (!tableId) {
-      throw new TableServiceError('Table ID is required');
+  async createTable(tableData: CreateTableRequest): Promise<CollectorTableConfig> {
+    if (this.useMockData) {
+      const newTable: CollectorTableConfig = {
+        ...tableData,
+        configId: (mockTables.length + 1).toString(),
+        lastModifiedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString()
+      };
+      mockTables.push(newTable);
+      return newTable;
     }
 
-    // 验证更新数据
-    if (Object.keys(updateData).length === 0) {
-      throw new TableServiceError('Update data cannot be empty');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tableData),
+      });
+      if (!response.ok) throw new Error('Failed to create table');
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating table:', error);
+      if (this.useMockData) {
+        const newTable: CollectorTableConfig = {
+          ...tableData,
+          configId: (mockTables.length + 1).toString(),
+          lastModifiedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString()
+        };
+        mockTables.push(newTable);
+        return newTable;
+      }
+      throw error;
     }
-
-    const response = await this.request<TableDetailConfig>(`/${tableId}`, {
-      method: 'PUT',
-      body: JSON.stringify(updateData),
-    });
-
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to update table');
-    }
-
-    return response.data;
   }
 
   /**
-   * 删除单个表格
+   * Update table
+   */
+  async updateTable(tableId: string, updateData: UpdateTableRequest): Promise<CollectorTableConfig> {
+    if (this.useMockData) {
+      const tableIndex = mockTables.findIndex(t => t.configId === tableId);
+      if (tableIndex === -1) throw new Error('Table not found');
+      
+      mockTables[tableIndex] = {
+        ...mockTables[tableIndex],
+        ...updateData,
+        lastModifiedAt: new Date().toISOString()
+      };
+      return mockTables[tableIndex];
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${tableId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+      if (!response.ok) throw new Error('Failed to update table');
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating table:', error);
+      if (this.useMockData) {
+        const tableIndex = mockTables.findIndex(t => t.configId === tableId);
+        if (tableIndex === -1) throw new Error('Table not found');
+        
+        mockTables[tableIndex] = {
+          ...mockTables[tableIndex],
+          ...updateData,
+          lastModifiedAt: new Date().toISOString()
+        };
+        return mockTables[tableIndex];
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Delete table
    */
   async deleteTable(tableId: string): Promise<void> {
-    if (!tableId) {
-      throw new TableServiceError('Table ID is required');
+    if (this.useMockData) {
+      const tableIndex = mockTables.findIndex(t => t.configId === tableId);
+      if (tableIndex === -1) throw new Error('Table not found');
+      mockTables.splice(tableIndex, 1);
+      return;
     }
 
-    const response = await this.request<void>(`/${tableId}`, {
-      method: 'DELETE',
-    });
-
-    if (!response.success) {
-      throw new TableServiceError(response.error || 'Failed to delete table');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/${tableId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete table');
+    } catch (error) {
+      console.error('Error deleting table:', error);
+      if (this.useMockData) {
+        const tableIndex = mockTables.findIndex(t => t.configId === tableId);
+        if (tableIndex === -1) throw new Error('Table not found');
+        mockTables.splice(tableIndex, 1);
+        return;
+      }
+      throw error;
     }
   }
 
   /**
-   * 批量删除表格
+   * Delete multiple tables
    */
   async deleteTables(tableIds: string[]): Promise<void> {
-    if (!tableIds || tableIds.length === 0) {
-      throw new TableServiceError('Table IDs are required');
+    if (this.useMockData) {
+      tableIds.forEach(id => {
+        const tableIndex = mockTables.findIndex(t => t.configId === id);
+        if (tableIndex !== -1) {
+          mockTables.splice(tableIndex, 1);
+        }
+      });
+      return;
     }
 
-    const response = await this.request<void>('/batch', {
-      method: 'DELETE',
-      body: JSON.stringify({ ids: tableIds }),
-    });
-
-    if (!response.success) {
-      throw new TableServiceError(response.error || 'Failed to delete tables');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/batch`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ids: tableIds }),
+      });
+      if (!response.ok) throw new Error('Failed to delete tables');
+    } catch (error) {
+      console.error('Error deleting tables:', error);
+      if (this.useMockData) {
+        tableIds.forEach(id => {
+          const tableIndex = mockTables.findIndex(t => t.configId === id);
+          if (tableIndex !== -1) {
+            mockTables.splice(tableIndex, 1);
+          }
+        });
+        return;
+      }
+      throw error;
     }
   }
 
   /**
-   * 根据模式获取表格
+   * Get tables by model name (equivalent to schema)
    */
-  async getTablesBySchema(schema: string): Promise<TableDetailConfig[]> {
-    if (!schema) {
-      throw new TableServiceError('Schema is required');
+  async getTablesBySchema(schema: string): Promise<CollectorTableConfig[]> {
+    if (this.useMockData) {
+      return mockTables.filter(table => table.modelName === schema);
     }
 
-    const response = await this.request<TableDetailConfig[]>(`/schema/${schema}`);
-    
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to fetch tables by schema');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/schema/${schema}`);
+      if (!response.ok) throw new Error('Failed to fetch tables by schema');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching tables by schema:', error);
+      if (this.useMockData) {
+        return mockTables.filter(table => table.modelName === schema);
+      }
+      throw error;
     }
-
-    return response.data;
   }
 
   /**
-   * 根据租户ID获取表格
+   * Get tables by tenant ID
    */
-  async getTablesByTenantId(tenantId: string): Promise<TableDetailConfig[]> {
-    if (!tenantId) {
-      throw new TableServiceError('Tenant ID is required');
+  async getTablesByTenantId(tenantId: string): Promise<CollectorTableConfig[]> {
+    if (this.useMockData) {
+      return mockTables.filter(table => table.tenantId === tenantId);
     }
 
-    const response = await this.request<TableDetailConfig[]>(`/tenant/${tenantId}`);
-    
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to fetch tables by tenant');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/tenant/${tenantId}`);
+      if (!response.ok) throw new Error('Failed to fetch tables by tenant');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching tables by tenant:', error);
+      if (this.useMockData) {
+        return mockTables.filter(table => table.tenantId === tenantId);
+      }
+      throw error;
     }
-
-    return response.data;
   }
 
   /**
-   * 根据模块触发器ID获取表格
+   * Get tables by model name (removed moduleTriggerId as it doesn't exist in CollectorTableConfig)
    */
-  async getTablesByModuleTriggerId(moduleTriggerId: string): Promise<TableDetailConfig[]> {
-    if (!moduleTriggerId) {
-      throw new TableServiceError('Module trigger ID is required');
+  async getTablesByModelName(modelName: string): Promise<CollectorTableConfig[]> {
+    if (this.useMockData) {
+      return mockTables.filter(table => table.modelName === modelName);
     }
 
-    const response = await this.request<TableDetailConfig[]>(`/module-trigger/${moduleTriggerId}`);
-    
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to fetch tables by module trigger');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/model/${modelName}`);
+      if (!response.ok) throw new Error('Failed to fetch tables by model');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching tables by model:', error);
+      if (this.useMockData) {
+        return mockTables.filter(table => table.modelName === modelName);
+      }
+      throw error;
     }
-
-    return response.data;
   }
 
   /**
-   * 获取表格统计信息
+   * Get table statistics
    */
   async getTableStats(): Promise<{
     total: number;
@@ -297,112 +511,349 @@ export class TableService {
     pending: number;
     bySchema: Record<string, number>;
   }> {
-    const response = await this.request<{
-      total: number;
-      active: number;
-      inactive: number;
-      pending: number;
-      bySchema: Record<string, number>;
-    }>('/stats');
-    
-    if (!response.success || !response.data) {
-      throw new TableServiceError(response.error || 'Failed to fetch table statistics');
+    if (this.useMockData) {
+      return mockTableStats;
     }
 
-    return response.data;
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/stats`);
+      if (!response.ok) throw new Error('Failed to fetch table statistics');
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching table statistics:', error);
+      if (this.useMockData) {
+        return mockTableStats;
+      }
+      throw error;
+    }
   }
 
   /**
-   * 验证表格数据
+   * Set mock data mode
    */
-  private validateTableData(data: CreateTableRequest): void {
-    const errors: string[] = [];
+  setMockDataMode(useMockData: boolean): void {
+    this.useMockData = useMockData;
+  }
 
-    // 验证必填字段
-    if (!data.name || data.name.trim().length === 0) {
-      errors.push('Table name is required');
+  /**
+   * Get current mock data mode
+   */
+  getMockDataMode(): boolean {
+    return this.useMockData;
+  }
+
+  /**
+   * Health check
+   */
+  async healthCheck(): Promise<boolean> {
+    if (this.useMockData) {
+      return true;
     }
 
-    if (!data.schema || data.schema.trim().length === 0) {
-      errors.push('Schema is required');
+    try {
+      const response = await fetch(`${API_BASE_URL}/tables/health`);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  // ===== CollectorTableConfig specific methods =====
+
+  /**
+   * Get all collector table configurations (raw backend format)
+   */
+  async getAllCollectorConfigs(): Promise<CollectorTableConfig[]> {
+    if (this.useMockData) {
+      return mockCollectorConfigs;
     }
 
-    if (!data.status) {
-      errors.push('Status is required');
-    }
-
-    // 验证状态值
-    if (data.status && !['active', 'inactive', 'pending'].includes(data.status)) {
-      errors.push('Invalid status value');
-    }
-
-    // 验证字段数组
-    if (!data.fields || !Array.isArray(data.fields) || data.fields.length === 0) {
-      errors.push('At least one field is required');
-    } else {
-      // 验证每个字段
-      data.fields.forEach((field, index) => {
-        if (!field.name || field.name.trim().length === 0) {
-          errors.push(`Field ${index + 1}: name is required`);
-        }
-        if (!field.type || field.type.trim().length === 0) {
-          errors.push(`Field ${index + 1}: type is required`);
-        }
+    try {
+      const response = await fetch(`${API_BASE_URL}/collector/config/table/all`, {
+        method: 'GET',
+        headers: getDefaultHeaders(),
       });
 
-      // 检查是否有主键
-      const hasPrimaryKey = data.fields.some(field => field.isPrimaryKey);
-      if (!hasPrimaryKey) {
-        errors.push('At least one field must be marked as primary key');
+      if (!response.ok) {
+        throw new TableServiceError(
+          `Failed to fetch collector configs: ${response.status} ${response.statusText}`,
+          response.status
+        );
       }
+
+      const data = await response.json();
+      return data.map((config: any) => this.processCollectorConfig(config));
+    } catch (error) {
+      if (error instanceof TableServiceError) {
+        throw error;
+      }
+      throw new TableServiceError(
+        'Failed to fetch collector table configurations',
+        undefined,
+        error as Error
+      );
+    }
+  }
+
+  /**
+   * Get collector config by ID
+   */
+  async getCollectorConfigById(configId: string): Promise<CollectorTableConfig> {
+    if (this.useMockData) {
+      const config = mockCollectorConfigs.find(c => c.configId === configId);
+      if (!config) {
+        throw new TableServiceError(`Collector config with ID ${configId} not found`, 404);
+      }
+      return config;
     }
 
-    // 验证记录数量
-    if (data.recordCount !== undefined && data.recordCount < 0) {
-      errors.push('Record count cannot be negative');
+    try {
+      const response = await fetch(`${API_BASE_URL}/collector/config/table/${configId}`, {
+        method: 'GET',
+        headers: getDefaultHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new TableServiceError(
+          `Failed to fetch collector config: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+
+      const data = await response.json();
+      return this.processCollectorConfig(data);
+    } catch (error) {
+      if (error instanceof TableServiceError) {
+        throw error;
+      }
+      throw new TableServiceError(
+        `Failed to fetch collector config with ID ${configId}`,
+        undefined,
+        error as Error
+      );
+    }
+  }
+
+  /**
+   * Create new collector table configuration
+   */
+  async createCollectorConfig(configData: Omit<CollectorTableConfig, 'configId' | 'createdAt' | 'lastModifiedAt' | 'version'>): Promise<CollectorTableConfig> {
+    if (this.useMockData) {
+      const newConfig: CollectorTableConfig = {
+        ...configData,
+        configId: `mock-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        lastModifiedAt: new Date().toISOString(),
+        version: 1
+      };
+      mockCollectorConfigs.push(newConfig);
+      return newConfig;
     }
 
-    if (errors.length > 0) {
-      throw new TableServiceError(`Validation failed: ${errors.join(', ')}`);
+    try {
+      const processedData = this.prepareCollectorConfigForAPI(configData);
+      
+      const response = await fetch(`${API_BASE_URL}/collector/config/table`, {
+        method: 'POST',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify(processedData),
+      });
+
+      if (!response.ok) {
+        throw new TableServiceError(
+          `Failed to create collector config: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+
+      const data = await response.json();
+      return this.processCollectorConfig(data);
+    } catch (error) {
+      if (error instanceof TableServiceError) {
+        throw error;
+      }
+      throw new TableServiceError(
+        'Failed to create collector table configuration',
+        undefined,
+        error as Error
+      );
     }
   }
 
   /**
-   * 设置认证令牌
+   * Update collector table configuration
    */
-  setAuthToken(token: string): void {
-    (this.defaultHeaders as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  async updateCollectorConfig(configId: string, updateData: Partial<Omit<CollectorTableConfig, 'configId' | 'createdAt' | 'createdBy'>>): Promise<CollectorTableConfig> {
+    if (this.useMockData) {
+      const index = mockCollectorConfigs.findIndex(c => c.configId === configId);
+      if (index === -1) {
+        throw new TableServiceError(`Collector config with ID ${configId} not found`, 404);
+      }
+      
+      mockCollectorConfigs[index] = {
+        ...mockCollectorConfigs[index],
+        ...updateData,
+        lastModifiedAt: new Date().toISOString(),
+        version: (mockCollectorConfigs[index].version || 1) + 1
+      };
+      return mockCollectorConfigs[index];
+    }
+
+    try {
+      const processedData = this.prepareCollectorConfigForAPI(updateData);
+      
+      const response = await fetch(`${API_BASE_URL}/collector/config/table/${configId}`, {
+        method: 'PUT',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify(processedData),
+      });
+
+      if (!response.ok) {
+        throw new TableServiceError(
+          `Failed to update collector config: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+
+      const data = await response.json();
+      return this.processCollectorConfig(data);
+    } catch (error) {
+      if (error instanceof TableServiceError) {
+        throw error;
+      }
+      throw new TableServiceError(
+        `Failed to update collector config with ID ${configId}`,
+        undefined,
+        error as Error
+      );
+    }
   }
 
   /**
-   * 移除认证令牌
+   * Delete collector table configuration
    */
-  removeAuthToken(): void {
-    delete (this.defaultHeaders as Record<string, string>)['Authorization'];
+  async deleteCollectorConfig(configId: string): Promise<void> {
+    if (this.useMockData) {
+      const index = mockCollectorConfigs.findIndex(c => c.configId === configId);
+      if (index === -1) {
+        throw new TableServiceError(`Collector config with ID ${configId} not found`, 404);
+      }
+      mockCollectorConfigs.splice(index, 1);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/collector/config/table/${configId}`, {
+        method: 'DELETE',
+        headers: getDefaultHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new TableServiceError(
+          `Failed to delete collector config: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+    } catch (error) {
+      if (error instanceof TableServiceError) {
+        throw error;
+      }
+      throw new TableServiceError(
+        `Failed to delete collector config with ID ${configId}`,
+        undefined,
+        error as Error
+      );
+    }
   }
 
   /**
-   * 设置自定义请求头
+   * Get collector configs by model name
    */
-  setCustomHeader(key: string, value: string): void {
-    (this.defaultHeaders as Record<string, string>)[key] = value;
+  async getCollectorConfigsByModel(modelName: string): Promise<CollectorTableConfig[]> {
+    if (this.useMockData) {
+      return mockCollectorConfigs.filter(c => c.modelName === modelName);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/collector/config/table/by-model/${modelName}`, {
+        method: 'GET',
+        headers: getDefaultHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new TableServiceError(
+          `Failed to fetch collector configs by model: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+
+      const data = await response.json();
+      return data.map((config: any) => this.processCollectorConfig(config));
+    } catch (error) {
+      if (error instanceof TableServiceError) {
+        throw error;
+      }
+      throw new TableServiceError(
+        `Failed to fetch collector configs for model ${modelName}`,
+        undefined,
+        error as Error
+      );
+    }
   }
 
   /**
-   * 移除自定义请求头
+   * Process raw collector config from API to ensure proper structure
    */
-  removeCustomHeader(key: string): void {
-    delete (this.defaultHeaders as Record<string, string>)[key];
+  private processCollectorConfig(rawConfig: any): CollectorTableConfig {
+    return {
+      ...rawConfig,
+      joinKeys: constructJoinConditions(rawConfig.joinKeys),
+      dependOn: constructDependencies(rawConfig.dependOn),
+      conditions: constructConditions(rawConfig.conditions),
+      jsonColumns: constructJsonColumns(rawConfig.jsonColumns),
+    };
+  }
+
+  /**
+   * Prepare collector config data for API submission
+   */
+  private prepareCollectorConfigForAPI(configData: any): any {
+    // Process complex nested structures before sending to API
+    const processedData = { ...configData };
+    
+    if (processedData.joinKeys) {
+      processedData.joinKeys = constructJoinConditions(processedData.joinKeys);
+    }
+    
+    if (processedData.dependOn) {
+      processedData.dependOn = constructDependencies(processedData.dependOn);
+    }
+    
+    if (processedData.conditions) {
+      processedData.conditions = constructConditions(processedData.conditions);
+    }
+    
+    if (processedData.jsonColumns) {
+      processedData.jsonColumns = constructJsonColumns(processedData.jsonColumns);
+    }
+    
+    return processedData;
   }
 }
 
-// 创建默认实例
+// Export singleton instance
 export const tableService = new TableService();
 
-// 导出错误类和类型
-export { TableServiceError };
-
+// Export types
 export type {
-  ApiResponse,
-  TablePaginationParams,
+  CollectorTableConfig,
+  CreateTableRequest,
+  UpdateTableRequest,
+  TableFilterParams,
+  PaginatedTableResponse,
+  TableStatus,
+  Condition,
+  JoinCondition,
+  Dependence,
+  JsonColumn
 };

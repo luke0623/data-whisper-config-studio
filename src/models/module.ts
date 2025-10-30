@@ -2,52 +2,52 @@
  * 模块基础接口
  */
 export interface Module {
-    module_id: string;
-    module_name: string;
+    moduleId: string;
+    moduleName: string;
     priority: number;
     version: string;
-    tenant_id: string;
-    created_at: string;
-    created_by: string;
-    last_modified_at: string;
-    last_modified_by: string;
+    tenantId: string;
+    createdAt: string;
+    createdBy: string;
+    lastModifiedAt: string;
+    lastModifiedBy: string;
 }
 
 /**
  * 创建模块请求接口
  */
 export interface CreateModuleRequest {
-    module_name: string;
+    moduleName: string;
     priority: number;
     version: string;
-    tenant_id: string;
-    created_by: string;
+    tenantId: string;
+    createdBy: string;
 }
 
 /**
  * 更新模块请求接口
  */
 export interface UpdateModuleRequest {
-    module_name?: string;
+    moduleName?: string;
     priority?: number;
     version?: string;
-    last_modified_by: string;
+    lastModifiedBy: string;
 }
 
 /**
  * 模块查询过滤参数
  */
 export interface ModuleFilterParams {
-    module_name?: string;
+    moduleName?: string;
     priority?: number;
     version?: string;
-    tenant_id?: string;
-    created_by?: string;
-    last_modified_by?: string;
-    created_at_from?: string;
-    created_at_to?: string;
-    last_modified_at_from?: string;
-    last_modified_at_to?: string;
+    tenantId?: string;
+    createdBy?: string;
+    lastModifiedBy?: string;
+    createdAtFrom?: string;
+    createdAtTo?: string;
+    lastModifiedAtFrom?: string;
+    lastModifiedAtTo?: string;
 }
 
 /**
