@@ -2,7 +2,7 @@ import { moduleService } from './moduleService';
 import { modelService } from './modelService';
 import { tableService } from './tableService';
 
-// 数据类型定义
+// Data type definitions
 export interface FlowRelationshipData {
   modules: any[];
   models: any[];
@@ -15,8 +15,8 @@ export interface FlowDataCache {
   error: string | null;
 }
 
-// 缓存配置
-const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存
+// Cache configuration
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
 const CACHE_KEY = 'flow_relationship_data';
 
 class FlowDataService {
@@ -26,7 +26,7 @@ class FlowDataService {
     error: null,
   };
 
-  // 检查缓存是否有效
+  // Check if cache is valid
   private isCacheValid(): boolean {
     const now = Date.now();
     return this.cache.data !== null && 
@@ -34,7 +34,7 @@ class FlowDataService {
            this.cache.error === null;
   }
 
-  // 清除缓存
+  // Clear cache
   public clearCache(): void {
     this.cache = {
       data: null,
@@ -43,11 +43,11 @@ class FlowDataService {
     };
   }
 
-  // 获取所有关系数据
+  // Get all relationship data
   public async getAllRelationshipData(forceRefresh = false): Promise<FlowRelationshipData> {
     console.log('[FlowDataService] Starting data fetch, forceRefresh:', forceRefresh);
     
-    // 如果有有效缓存且不强制刷新，返回缓存数据
+    // If there's valid cache and not forcing refresh, return cached data
     if (!forceRefresh && this.isCacheValid() && this.cache.data) {
       console.log('[FlowDataService] Using cached data');
       return this.cache.data;
@@ -56,16 +56,16 @@ class FlowDataService {
     try {
       console.log('[FlowDataService] Fetching fresh data from APIs');
       
-      // 确保服务使用远程数据
+      // Ensure services use remote data
       moduleService.setMockDataMode(false);
       modelService.setMockDataMode(false);
       tableService.setMockDataMode(false);
 
-      // 并行获取所有数据
+      // Fetch all data in parallel
       console.log('[FlowDataService] Making parallel API calls...');
       const [modulesData, modelsData, tablesData] = await Promise.all([
         moduleService.getAllModules(),
-        modelService.getAllModels(), // 使用getAllModels获取所有模型数据
+        modelService.getAllModels(), // Use getAllModels to get all model data
         tableService.getAllTables(),
       ]);
 
@@ -74,7 +74,7 @@ class FlowDataService {
       console.log('- Models:', modelsData?.length || 0, 'items');
       console.log('- Tables:', tablesData?.length || 0, 'items');
 
-      // modelsData已经是数组格式，无需额外处理
+      // modelsData is already in array format, no additional processing needed
       const models = modelsData || [];
 
       const relationshipData: FlowRelationshipData = {
@@ -89,7 +89,7 @@ class FlowDataService {
         tables: relationshipData.tables.length
       });
 
-      // 更新缓存
+      // Update cache
       this.cache = {
         data: relationshipData,
         timestamp: Date.now(),
@@ -102,7 +102,7 @@ class FlowDataService {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('[FlowDataService] Error fetching data:', errorMessage);
       
-      // 更新缓存错误状态
+      // Update cache error status
       this.cache = {
         data: null,
         timestamp: Date.now(),
@@ -113,7 +113,7 @@ class FlowDataService {
     }
   }
 
-  // 获取缓存状态
+  // Get cache status
   public getCacheStatus(): { 
     hasCache: boolean; 
     isValid: boolean; 
@@ -129,7 +129,7 @@ class FlowDataService {
     };
   }
 
-  // 预加载数据
+  // Preload data
   public async preloadData(): Promise<void> {
     try {
       await this.getAllRelationshipData();
@@ -139,5 +139,5 @@ class FlowDataService {
   }
 }
 
-// 导出单例实例
+// Export singleton instance
 export const flowDataService = new FlowDataService();
