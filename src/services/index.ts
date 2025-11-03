@@ -6,6 +6,7 @@ export { default as monitorService } from './monitorService';
 export { default as discoveryService } from './discoveryService';
 export { tableService } from './tableService';
 export { moduleService } from './moduleService';
+export { modelService } from './modelService';
 
 // Also export default instances for flexibility
 import apiService from './api';
@@ -13,11 +14,13 @@ import configService from './configService';
 import monitorService from './monitorService';
 import { tableService } from './tableService';
 import { moduleService } from './moduleService';
+import { modelService } from './modelService';
 
 export default {
   api: apiService,
   config: configService,
   monitor: monitorService,
   table: tableService,
-  module: moduleService
+  module: moduleService,
+  model: modelService
 };

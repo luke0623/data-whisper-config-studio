@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -10,15 +10,22 @@ import { toast } from '@/hooks/use-toast';
 import ModuleSelector from '@/components/ModuleSelector';
 import ModelSelector from '@/components/ModelSelector';
 import ConfigurationPreview from '@/components/ConfigurationPreview';
-import { configService } from '@/services';
+import { configService, moduleService, modelService, tableService } from '@/services';
 import { ConfigurationData } from '@/models';
 
 const ConfigurationForm = () => {
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
-  const [isAiEnabled, setIsAiEnabled] = useState(true);
+  const [isAiEnabled, setIsAiEnabled] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
+
+  // Ensure all services use real data instead of mock data
+  useEffect(() => {
+    moduleService.setMockDataMode(false);
+    modelService.setMockDataMode(false);
+    tableService.setMockDataMode(false);
+  }, []);
 
   const handleTestConfiguration = async () => {
     if (!selectedModule || !selectedModel) {
