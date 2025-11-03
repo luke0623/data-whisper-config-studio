@@ -16,8 +16,8 @@ const Config = () => {
             <Settings className="h-8 w-8 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Watchmen Configuration</h1>
-            <p className="text-gray-600 mt-1">Configure your data extraction settings for optimal results</p>
+            <h1 className="text-3xl font-bold text-gray-900">Test Config</h1>
+            <p className="text-gray-600 mt-1">Test your data extraction configuration settings</p>
           </div>
         </div>
         <Button variant="outline" size="sm" className="gap-2 self-start md:self-auto">
@@ -30,10 +30,10 @@ const Config = () => {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
         <div>
-          <h3 className="font-medium text-blue-800">Configuration Wizard</h3>
+          <h3 className="font-medium text-blue-800">Test Configuration Wizard</h3>
           <p className="text-sm text-blue-700 mt-1">
-            This wizard will guide you through setting up your data extraction configuration.
-            Follow the steps to select your module, model, and tables for data ingestion.
+            This wizard will guide you through testing your data extraction configuration.
+            Follow the steps to select your module and model for testing.
           </p>
         </div>
       </div>

@@ -4,12 +4,13 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Minus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   CollectorTableConfig, 
   TableStatus, 
@@ -21,6 +22,238 @@ import {
   JsonColumn 
 } from '@/models/table';
 import { tableService, TableServiceError } from '@/services/tableService';
+
+// Helper components for complex data structures
+const ConditionEditor = ({ 
+  conditions, 
+  onChange 
+}: { 
+  conditions: Condition[], 
+  onChange: (conditions: Condition[]) => void 
+}) => {
+  const addCondition = () => {
+    onChange([...conditions, { field: '', operator: '', value: '', type: '' }]);
+  };
+
+  const updateCondition = (index: number, field: keyof Condition, value: any) => {
+    const updated = [...conditions];
+    updated[index] = { ...updated[index], [field]: value };
+    onChange(updated);
+  };
+
+  const removeCondition = (index: number) => {
+    onChange(conditions.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3">
+      {conditions.map((condition, index) => (
+        <div key={index} className="flex gap-2 items-end">
+          <div className="flex-1">
+            <Input
+              placeholder="Field"
+              value={condition.field || ''}
+              onChange={(e) => updateCondition(index, 'field', e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <Select
+              value={condition.operator || ''}
+              onValueChange={(value) => updateCondition(index, 'operator', value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Operator" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="=">=</SelectItem>
+                <SelectItem value="!=">!=</SelectItem>
+                <SelectItem value=">">&gt;</SelectItem>
+                <SelectItem value="<">&lt;</SelectItem>
+                <SelectItem value=">=">&gt;=</SelectItem>
+                <SelectItem value="<=">&lt;=</SelectItem>
+                <SelectItem value="LIKE">LIKE</SelectItem>
+                <SelectItem value="IN">IN</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex-1">
+            <Input
+              placeholder="Value"
+              value={condition.value || ''}
+              onChange={(e) => updateCondition(index, 'value', e.target.value)}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => removeCondition(index)}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addCondition}>
+        <Plus className="h-4 w-4 mr-2" />
+        Add Condition
+      </Button>
+    </div>
+  );
+};
+
+const DependenceEditor = ({ 
+  dependencies, 
+  onChange 
+}: { 
+  dependencies: Dependence[], 
+  onChange: (dependencies: Dependence[]) => void 
+}) => {
+  const addDependence = () => {
+    onChange([...dependencies, { modelName: '', objectKey: '' }]);
+  };
+
+  const updateDependence = (index: number, field: keyof Dependence, value: string) => {
+    const updated = [...dependencies];
+    updated[index] = { ...updated[index], [field]: value };
+    onChange(updated);
+  };
+
+  const removeDependence = (index: number) => {
+    onChange(dependencies.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3">
+      {dependencies.map((dep, index) => (
+        <div key={index} className="flex gap-2 items-end">
+          <div className="flex-1">
+            <Input
+              placeholder="Model Name"
+              value={dep.modelName || ''}
+              onChange={(e) => updateDependence(index, 'modelName', e.target.value)}
+            />
+          </div>
+          <div className="flex-1">
+            <Input
+              placeholder="Object Key"
+              value={dep.objectKey || ''}
+              onChange={(e) => updateDependence(index, 'objectKey', e.target.value)}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => removeDependence(index)}
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addDependence}>
+        <Plus className="h-4 w-4 mr-2" />
+        Add Dependence
+      </Button>
+    </div>
+  );
+};
+
+const JsonColumnEditor = ({ 
+  jsonColumns, 
+  onChange 
+}: { 
+  jsonColumns: JsonColumn[], 
+  onChange: (jsonColumns: JsonColumn[]) => void 
+}) => {
+  const addJsonColumn = () => {
+    onChange([...jsonColumns, { 
+      columnName: '', 
+      ignoredPath: [], 
+      needFlatten: false, 
+      flattenPath: [], 
+      jsonPath: [] 
+    }]);
+  };
+
+  const updateJsonColumn = (index: number, field: keyof JsonColumn, value: any) => {
+    const updated = [...jsonColumns];
+    updated[index] = { ...updated[index], [field]: value };
+    onChange(updated);
+  };
+
+  const removeJsonColumn = (index: number) => {
+    onChange(jsonColumns.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-4">
+      {jsonColumns.map((jsonCol, index) => (
+        <div key={index} className="border rounded-lg p-4 space-y-3">
+          <div className="flex justify-between items-center">
+            <h4 className="font-medium">JSON Column {index + 1}</h4>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => removeJsonColumn(index)}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label>Column Name</Label>
+              <Input
+                placeholder="Column Name"
+                value={jsonCol.columnName || ''}
+                onChange={(e) => updateJsonColumn(index, 'columnName', e.target.value)}
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={`needFlatten-${index}`}
+                checked={jsonCol.needFlatten || false}
+                onCheckedChange={(checked) => updateJsonColumn(index, 'needFlatten', checked)}
+              />
+              <Label htmlFor={`needFlatten-${index}`}>Need Flatten</Label>
+            </div>
+            <div>
+              <Label>Ignored Paths (comma separated)</Label>
+              <Input
+                placeholder="path1, path2, path3"
+                value={jsonCol.ignoredPath?.join(', ') || ''}
+                onChange={(e) => updateJsonColumn(index, 'ignoredPath', 
+                  e.target.value.split(',').map(p => p.trim()).filter(p => p))}
+              />
+            </div>
+            <div>
+              <Label>Flatten Paths (comma separated)</Label>
+              <Input
+                placeholder="path1, path2, path3"
+                value={jsonCol.flattenPath?.join(', ') || ''}
+                onChange={(e) => updateJsonColumn(index, 'flattenPath', 
+                  e.target.value.split(',').map(p => p.trim()).filter(p => p))}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <Label>JSON Paths (comma separated)</Label>
+              <Input
+                placeholder="$.path1, $.path2, $.path3"
+                value={jsonCol.jsonPath?.join(', ') || ''}
+                onChange={(e) => updateJsonColumn(index, 'jsonPath', 
+                  e.target.value.split(',').map(p => p.trim()).filter(p => p))}
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={addJsonColumn}>
+        <Plus className="h-4 w-4 mr-2" />
+        Add JSON Column
+      </Button>
+    </div>
+  );
+};
 
 const Tables = () => {
   const [tables, setTables] = useState<CollectorTableConfig[]>([]);
@@ -58,12 +291,12 @@ const Tables = () => {
     dataSourceId: '',
     isList: false,
     triggered: false,
-    tenantId: '',
     createdBy: '',
     lastModifiedBy: ''
   });
   const [createLoading, setCreateLoading] = useState<boolean>(false);
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
+  const [editFormErrors, setEditFormErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Function to fetch table data
@@ -244,7 +477,6 @@ const Tables = () => {
       dataSourceId: table.dataSourceId,
       isList: table.isList,
       triggered: table.triggered,
-      tenantId: table.tenantId,
       createdAt: table.createdAt,
       createdBy: table.createdBy,
       lastModifiedAt: table.lastModifiedAt,
@@ -261,6 +493,12 @@ const Tables = () => {
       setLoading(true);
       setError(null);
 
+      // Form validation
+      if (!validateForm(editFormData, true)) {
+        setLoading(false);
+        return;
+      }
+
       // Call TableService to update table
       const updatedTable = await tableService.updateTable(selectedTable.configId!, editFormData);
       
@@ -274,6 +512,10 @@ const Tables = () => {
       setEditDialogOpen(false);
       setSelectedTable(null);
       setEditFormData({});
+      setSuccessMessage(`Table "${editFormData.name}" updated successfully!`);
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
       console.error('Error updating table:', error);
       if (error instanceof TableServiceError) {
@@ -339,7 +581,6 @@ const Tables = () => {
       label: '',
       modelName: '',
       tableName: '',
-      tenantId: '',
       createdBy: '',
       lastModifiedBy: '',
       primaryKey: [],
@@ -361,28 +602,113 @@ const Tables = () => {
   };
 
   // Validate form data
-  const validateForm = (): boolean => {
+  const validateForm = (formData: any, isEdit: boolean = false): boolean => {
     const errors: {[key: string]: string} = {};
 
     // Validate required fields
-    if (!createFormData.name.trim()) {
-      errors.name = 'Table name cannot be empty';
-    } else if (createFormData.name.length < 2) {
-      errors.name = 'Table name must be at least 2 characters';
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(createFormData.name)) {
-      errors.name = 'Table name can only contain letters, numbers, underscores and hyphens';
+    if (!formData.name?.trim()) {
+      errors.name = 'Name cannot be empty';
+    } else if (formData.name.length < 2) {
+      errors.name = 'Name must be at least 2 characters';
+    } else if (!/^[a-zA-Z0-9_\s-]+$/.test(formData.name)) {
+      errors.name = 'Name can only contain letters, numbers, spaces, underscores and hyphens';
     }
 
-    if (!createFormData.modelName.trim()) {
+    // tableName is optional but if provided should be valid
+    if (formData.tableName && !/^[a-zA-Z0-9_]+$/.test(formData.tableName)) {
+      errors.tableName = 'Table name can only contain letters, numbers and underscores';
+    }
+
+    if (!formData.modelName?.trim()) {
       errors.modelName = 'Model name cannot be empty';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(createFormData.modelName)) {
+    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.modelName)) {
       errors.modelName = 'Model name can only contain letters, numbers and underscores';
     }
 
-    // Note: Field validation removed as CollectorTableConfig doesn't have fields property
-    // Note: Record count validation removed as CollectorTableConfig doesn't have recordCount property
+    // Validate primary key format if provided
+    if (formData.primaryKey && Array.isArray(formData.primaryKey) && formData.primaryKey.length > 0) {
+      const invalidKeys = formData.primaryKey.filter((key: string) => !key.trim() || !/^[a-zA-Z0-9_]+$/.test(key));
+      if (invalidKeys.length > 0) {
+        errors.primaryKey = 'Primary keys can only contain letters, numbers and underscores';
+      }
+    }
 
-    setFormErrors(errors);
+    // Validate object key format if provided
+    if (formData.objectKey && !/^[a-zA-Z0-9_]+$/.test(formData.objectKey)) {
+      errors.objectKey = 'Object key can only contain letters, numbers and underscores';
+    }
+
+    // Validate sequence key format if provided
+    if (formData.sequenceKey && !/^[a-zA-Z0-9_]+$/.test(formData.sequenceKey)) {
+      errors.sequenceKey = 'Sequence key can only contain letters, numbers and underscores';
+    }
+
+    // Validate audit column format if provided
+    if (formData.auditColumn && !/^[a-zA-Z0-9_]+$/.test(formData.auditColumn)) {
+      errors.auditColumn = 'Audit column can only contain letters, numbers and underscores';
+    }
+
+    // Validate ignored columns format if provided
+    if (formData.ignoredColumns && Array.isArray(formData.ignoredColumns) && formData.ignoredColumns.length > 0) {
+      const invalidColumns = formData.ignoredColumns.filter((col: string) => !col.trim() || !/^[a-zA-Z0-9_]+$/.test(col));
+      if (invalidColumns.length > 0) {
+        errors.ignoredColumns = 'Ignored columns can only contain letters, numbers and underscores';
+      }
+    }
+
+    // Validate parent name format if provided
+    if (formData.parentName && !/^[a-zA-Z0-9_]+$/.test(formData.parentName)) {
+      errors.parentName = 'Parent name can only contain letters, numbers and underscores';
+    }
+
+    // Validate data source ID format if provided
+    if (formData.dataSourceId && !/^[a-zA-Z0-9_-]+$/.test(formData.dataSourceId)) {
+      errors.dataSourceId = 'Data source ID can only contain letters, numbers, underscores and hyphens';
+    }
+
+    // Validate complex structures
+    if (formData.conditions && Array.isArray(formData.conditions)) {
+      formData.conditions.forEach((condition: any, index: number) => {
+        if (!condition.field?.trim()) {
+          errors[`condition_${index}_field`] = `Condition ${index + 1}: Field is required`;
+        }
+        if (!condition.operator?.trim()) {
+          errors[`condition_${index}_operator`] = `Condition ${index + 1}: Operator is required`;
+        }
+        if (condition.value === undefined || condition.value === null || condition.value === '') {
+          errors[`condition_${index}_value`] = `Condition ${index + 1}: Value is required`;
+        }
+      });
+    }
+
+    if (formData.dependOn && Array.isArray(formData.dependOn)) {
+      formData.dependOn.forEach((dep: any, index: number) => {
+        if (!dep.table?.trim()) {
+          errors[`dependency_${index}_table`] = `Dependency ${index + 1}: Table is required`;
+        }
+        if (!dep.field?.trim()) {
+          errors[`dependency_${index}_field`] = `Dependency ${index + 1}: Field is required`;
+        }
+      });
+    }
+
+    if (formData.jsonColumns && Array.isArray(formData.jsonColumns)) {
+      formData.jsonColumns.forEach((col: any, index: number) => {
+        if (!col.name?.trim()) {
+          errors[`json_column_${index}_name`] = `JSON Column ${index + 1}: Name is required`;
+        }
+        if (!col.path?.trim()) {
+          errors[`json_column_${index}_path`] = `JSON Column ${index + 1}: Path is required`;
+        }
+      });
+    }
+
+    if (isEdit) {
+      setEditFormErrors(errors);
+    } else {
+      setFormErrors(errors);
+    }
+    
     return Object.keys(errors).length === 0;
   };
 
@@ -393,7 +719,7 @@ const Tables = () => {
       setError(null);
 
       // Form validation
-      if (!validateForm()) {
+      if (!validateForm(createFormData, false)) {
         setCreateLoading(false);
         return;
       }
@@ -857,11 +1183,6 @@ const Tables = () => {
                     <div className="text-gray-600">Data source identifier</div>
                   </div>
                   <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
-                    <div className="font-medium">Tenant ID</div>
-                    <div className="text-gray-600">{selectedTable.tenantId || 'None'}</div>
-                    <div className="text-gray-600">Tenant identifier</div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4 p-3 border-t text-sm">
                     <div className="font-medium">Audit Column</div>
                     <div className="text-gray-600">{selectedTable.auditColumn || 'None'}</div>
                     <div className="text-gray-600">Column for audit tracking</div>
@@ -919,35 +1240,36 @@ const Tables = () => {
 
       {/* Edit Table Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Edit className="h-5 w-5" />
-              Configure - {selectedTable?.name}
+              Edit Table - {selectedTable?.name}
             </DialogTitle>
           </DialogHeader>
           {selectedTable && (
             <div className="space-y-6">
+              {/* Basic Information */}
               <div>
                 <h3 className="text-lg font-medium mb-4">Basic Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit-name">Table Name</Label>
+                    <Label htmlFor="edit-name">Name</Label>
                     <Input
                       id="edit-name"
                       value={editFormData.name || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                      placeholder="Enter table name"
+                      placeholder="Enter display name"
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="edit-table-name">Table Name (System)</Label>
+                    <Label htmlFor="edit-table-name">Table Name</Label>
                     <Input
                       id="edit-table-name"
                       value={editFormData.tableName || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, tableName: e.target.value })}
-                      placeholder="Enter system table name"
+                      placeholder="Enter database table name"
                     />
                   </div>
 
@@ -960,21 +1282,15 @@ const Tables = () => {
                       placeholder="Enter model name"
                     />
                   </div>
-                  
+
                   <div>
-                    <Label htmlFor="edit-triggered">Triggered</Label>
-                    <Select
-                      value={editFormData.triggered ? 'true' : 'false'}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, triggered: value === 'true' })}
-                    >
-                      <SelectTrigger id="edit-triggered">
-                        <SelectValue placeholder="Select trigger mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">Triggered</SelectItem>
-                        <SelectItem value="false">Manual</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="edit-parent-name">Parent Name</Label>
+                    <Input
+                      id="edit-parent-name"
+                      value={editFormData.parentName || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, parentName: e.target.value })}
+                      placeholder="Enter parent table name"
+                    />
                   </div>
 
                   <div className="md:col-span-2">
@@ -983,7 +1299,7 @@ const Tables = () => {
                       id="edit-label"
                       value={editFormData.label || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
-                      placeholder="Enter table label"
+                      placeholder="Enter table description"
                       rows={3}
                     />
                   </div>
@@ -992,83 +1308,9 @@ const Tables = () => {
 
               <Separator />
 
+              {/* Key Configuration */}
               <div>
-                <h3 className="text-lg font-medium mb-4">Configuration Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-object-key">Object Key</Label>
-                    <Input
-                      id="edit-object-key"
-                      value={editFormData.objectKey || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, objectKey: e.target.value })}
-                      placeholder="Enter object key"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-sequence-key">Sequence Key</Label>
-                    <Input
-                      id="edit-sequence-key"
-                      value={editFormData.sequenceKey || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, sequenceKey: e.target.value })}
-                      placeholder="Enter sequence key"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-parent-name">Parent Name</Label>
-                    <Input
-                      id="edit-parent-name"
-                      value={editFormData.parentName || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, parentName: e.target.value })}
-                      placeholder="Enter parent name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-data-source-id">Data Source ID</Label>
-                    <Input
-                      id="edit-data-source-id"
-                      value={editFormData.dataSourceId || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, dataSourceId: e.target.value })}
-                      placeholder="Enter data source ID"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-is-list" className="block mb-2">Is List</Label>
-                    <Select
-                      value={editFormData.isList ? 'true' : 'false'}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, isList: value === 'true' })}
-                    >
-                      <SelectTrigger id="edit-is-list">
-                        <SelectValue placeholder="Select list type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">List</SelectItem>
-                        <SelectItem value="false">Single</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-
-
-                  <div>
-                    <Label htmlFor="edit-tenant-id">Tenant ID</Label>
-                    <Input
-                      id="edit-tenant-id"
-                      value={editFormData.tenantId || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, tenantId: e.target.value })}
-                      placeholder="Enter tenant ID"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="text-lg font-medium mb-4">Collector Configuration</h3>
+                <h3 className="text-lg font-medium mb-4">Key Configuration</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="edit-primary-key">Primary Key</Label>
@@ -1104,32 +1346,86 @@ const Tables = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="edit-parent-name">Parent Name</Label>
-                    <Input
-                      id="edit-parent-name"
-                      value={editFormData.parentName || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, parentName: e.target.value })}
-                      placeholder="Enter parent name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-label">Label</Label>
-                    <Input
-                      id="edit-label"
-                      value={editFormData.label || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, label: e.target.value })}
-                      placeholder="Enter label"
-                    />
-                  </div>
-
-                  <div>
                     <Label htmlFor="edit-audit-column">Audit Column</Label>
                     <Input
                       id="edit-audit-column"
                       value={editFormData.auditColumn || ''}
                       onChange={(e) => setEditFormData({ ...editFormData, auditColumn: e.target.value })}
                       placeholder="Enter audit column"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Complex Configuration */}
+              <div>
+                <h3 className="text-lg font-medium mb-4">Complex Configuration</h3>
+                
+                {/* Join Keys */}
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-2 block">Join Keys</Label>
+                  <div className="border rounded-lg p-4 bg-gray-50">
+                    <p className="text-sm text-gray-600 mb-2">Configure join conditions for this table</p>
+                    {/* TODO: Add JoinConditionEditor component */}
+                    <Textarea
+                      placeholder="Enter join keys as JSON (e.g., [{&quot;parentKey&quot;: {&quot;field&quot;: &quot;id&quot;}, &quot;childKey&quot;: {&quot;field&quot;: &quot;parent_id&quot;}}])"
+                      value={editFormData.joinKeys ? JSON.stringify(editFormData.joinKeys, null, 2) : ''}
+                      onChange={(e) => {
+                        try {
+                          const parsed = e.target.value ? JSON.parse(e.target.value) : [];
+                          setEditFormData(prev => ({ ...prev, joinKeys: parsed }));
+                        } catch {
+                          // Keep the text value for editing, will validate on save
+                        }
+                      }}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Dependencies */}
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-2 block">Dependencies</Label>
+                  <DependenceEditor
+                    dependencies={editFormData.dependOn || []}
+                    onChange={(dependencies) => setEditFormData({ ...editFormData, dependOn: dependencies })}
+                  />
+                </div>
+
+                {/* Conditions */}
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-2 block">Conditions</Label>
+                  <ConditionEditor
+                    conditions={editFormData.conditions || []}
+                    onChange={(conditions) => setEditFormData({ ...editFormData, conditions })}
+                  />
+                </div>
+
+                {/* JSON Columns */}
+                <div className="mb-6">
+                  <Label className="text-sm font-medium mb-2 block">JSON Columns</Label>
+                  <JsonColumnEditor
+                    jsonColumns={editFormData.jsonColumns || []}
+                    onChange={(jsonColumns) => setEditFormData({ ...editFormData, jsonColumns })}
+                  />
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Flags and Data Source */}
+              <div>
+                <h3 className="text-lg font-medium mb-4">Flags and Data Source</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="edit-data-source-id">Data Source ID</Label>
+                    <Input
+                      id="edit-data-source-id"
+                      value={editFormData.dataSourceId || ''}
+                      onChange={(e) => setEditFormData({ ...editFormData, dataSourceId: e.target.value })}
+                      placeholder="Enter data source ID"
                     />
                   </div>
 
@@ -1146,96 +1442,25 @@ const Tables = () => {
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="edit-data-source-id">Data Source ID</Label>
-                    <Input
-                      id="edit-data-source-id"
-                      value={editFormData.dataSourceId || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, dataSourceId: e.target.value })}
-                      placeholder="Enter data source ID"
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-is-list"
+                      checked={editFormData.isList || false}
+                      onCheckedChange={(checked) => setEditFormData({ ...editFormData, isList: checked as boolean })}
                     />
+                    <Label htmlFor="edit-is-list">Is List</Label>
                   </div>
 
-                  <div>
-                    <Label htmlFor="edit-is-list" className="block mb-2">Is List</Label>
-                    <Select
-                      value={editFormData.isList ? 'true' : 'false'}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, isList: value === 'true' })}
-                    >
-                      <SelectTrigger id="edit-is-list">
-                        <SelectValue placeholder="Select list status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-triggered" className="block mb-2">Triggered</Label>
-                    <Select
-                      value={editFormData.triggered ? 'true' : 'false'}
-                      onValueChange={(value) => setEditFormData({ ...editFormData, triggered: value === 'true' })}
-                    >
-                      <SelectTrigger id="edit-triggered">
-                        <SelectValue placeholder="Select trigger status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="true">Yes</SelectItem>
-                        <SelectItem value="false">No</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="edit-triggered"
+                      checked={editFormData.triggered || false}
+                      onCheckedChange={(checked) => setEditFormData({ ...editFormData, triggered: checked as boolean })}
+                    />
+                    <Label htmlFor="edit-triggered">Triggered</Label>
                   </div>
                 </div>
               </div>
-
-              <Separator />
-
-              {/* <div>
-                <h3 className="text-lg font-medium mb-4">Audit Information</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="edit-created-at">Created At</Label>
-                    <Input
-                      id="edit-created-at"
-                      type="date"
-                      value={editFormData.createdAt || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, createdAt: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-created-by">Created By</Label>
-                    <Input
-                      id="edit-created-by"
-                      value={editFormData.createdBy || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, createdBy: e.target.value })}
-                      placeholder="Enter creator name"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-last-modified-at">Last Modified At</Label>
-                    <Input
-                      id="edit-last-modified-at"
-                      type="date"
-                      value={editFormData.lastModifiedAt || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, lastModifiedAt: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="edit-last-modified-by">Last Modified By</Label>
-                    <Input
-                      id="edit-last-modified-by"
-                      value={editFormData.lastModifiedBy || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, lastModifiedBy: e.target.value })}
-                      placeholder="Enter modifier name"
-                    />
-                  </div>
-                </div>
-              </div> */}
               
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
@@ -1282,19 +1507,19 @@ const Tables = () => {
 
       {/* Create Table Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Table</DialogTitle>
           </DialogHeader>
           <div className="space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Basic Information</h3>
+              <h3 className="text-lg font-medium border-b pb-2">Basic Information</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="table-name">Table Name *</Label>
+                  <Label htmlFor="name">Name *</Label>
                   <Input
-                    id="table-name"
+                    id="name"
                     value={createFormData.name}
                     onChange={(e) => setCreateFormData(prev => ({ ...prev, name: e.target.value }))}
                     placeholder="Enter table name"
@@ -1305,9 +1530,22 @@ const Tables = () => {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="table-model-name">Model Name *</Label>
+                  <Label htmlFor="tableName">Table Name *</Label>
                   <Input
-                    id="table-model-name"
+                    id="tableName"
+                    value={createFormData.tableName}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, tableName: e.target.value }))}
+                    placeholder="Enter database table name"
+                    className={formErrors.tableName ? "border-red-500" : ""}
+                  />
+                  {formErrors.tableName && (
+                    <p className="text-sm text-red-600">{formErrors.tableName}</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="modelName">Model Name *</Label>
+                  <Input
+                    id="modelName"
                     value={createFormData.modelName}
                     onChange={(e) => setCreateFormData(prev => ({ ...prev, modelName: e.target.value }))}
                     placeholder="Enter model name"
@@ -1317,65 +1555,38 @@ const Tables = () => {
                     <p className="text-sm text-red-600">{formErrors.modelName}</p>
                   )}
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="parentName">Parent Name</Label>
+                  <Input
+                    id="parentName"
+                    value={createFormData.parentName}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, parentName: e.target.value }))}
+                    placeholder="Enter parent name"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="table-label">Label</Label>
+                <Label htmlFor="label">Label</Label>
                 <Textarea
-                  id="table-label"
+                  id="label"
                   value={createFormData.label}
                   onChange={(e) => setCreateFormData(prev => ({ ...prev, label: e.target.value }))}
-                  placeholder="Enter table label"
+                  placeholder="Enter table description/label"
                   rows={3}
                 />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="table-triggered">Triggered</Label>
-                  <Select 
-                    value={createFormData.triggered ? 'true' : 'false'} 
-                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, triggered: value === 'true' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select trigger type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Triggered</SelectItem>
-                      <SelectItem value="false">Manual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="data-source-id">Data Source ID</Label>
-                  <Input
-                    id="data-source-id"
-                    value={createFormData.dataSourceId}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, dataSourceId: e.target.value }))}
-                    placeholder="Enter data source ID"
-                  />
-                </div>
-              </div>
             </div>
 
+            <Separator />
 
-
-            {/* Advanced Configuration */}
+            {/* Key Configuration */}
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Advanced Configuration</h3>
+              <h3 className="text-lg font-medium border-b pb-2">Key Configuration</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="tenant-id">Tenant ID</Label>
+                  <Label htmlFor="primaryKey">Primary Key</Label>
                   <Input
-                    id="tenant-id"
-                    value={createFormData.tenantId}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, tenantId: e.target.value }))}
-                    placeholder="Enter tenant ID"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="primary-key">Primary Key</Label>
-                  <Input
-                    id="primary-key"
+                    id="primaryKey"
                     value={createFormData.primaryKey?.join(', ') || ''}
                     onChange={(e) => setCreateFormData(prev => ({ 
                       ...prev, 
@@ -1385,54 +1596,106 @@ const Tables = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="object-key">Object Key</Label>
+                  <Label htmlFor="objectKey">Object Key</Label>
                   <Input
-                    id="object-key"
+                    id="objectKey"
                     value={createFormData.objectKey}
                     onChange={(e) => setCreateFormData(prev => ({ ...prev, objectKey: e.target.value }))}
                     placeholder="Enter object key"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="sequence-key">Sequence Key</Label>
+                  <Label htmlFor="sequenceKey">Sequence Key</Label>
                   <Input
-                    id="sequence-key"
+                    id="sequenceKey"
                     value={createFormData.sequenceKey}
                     onChange={(e) => setCreateFormData(prev => ({ ...prev, sequenceKey: e.target.value }))}
                     placeholder="Enter sequence key"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="parent-name">Parent Name</Label>
+                  <Label htmlFor="auditColumn">Audit Column</Label>
                   <Input
-                    id="parent-name"
-                    value={createFormData.parentName}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, parentName: e.target.value }))}
-                    placeholder="Enter parent name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="label">Label</Label>
-                  <Input
-                    id="label"
-                    value={createFormData.label}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, label: e.target.value }))}
-                    placeholder="Enter label"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="audit-column">Audit Column</Label>
-                  <Input
-                    id="audit-column"
+                    id="auditColumn"
                     value={createFormData.auditColumn}
                     onChange={(e) => setCreateFormData(prev => ({ ...prev, auditColumn: e.target.value }))}
                     placeholder="Enter audit column"
                   />
                 </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Complex Fields */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Complex Configuration</h3>
+              
+              {/* Join Keys */}
+              <div className="space-y-2">
+                <Label>Join Keys</Label>
+                <Textarea
+                  placeholder="Enter join keys as JSON (e.g., [{&quot;parentKey&quot;: {&quot;field&quot;: &quot;id&quot;}, &quot;childKey&quot;: {&quot;field&quot;: &quot;parent_id&quot;}}])"
+                  value={createFormData.joinKeys ? JSON.stringify(createFormData.joinKeys, null, 2) : ''}
+                  onChange={(e) => {
+                    try {
+                      const parsed = e.target.value ? JSON.parse(e.target.value) : [];
+                      setCreateFormData(prev => ({ ...prev, joinKeys: parsed }));
+                    } catch {
+                      // Keep the text value for editing, will validate on save
+                    }
+                  }}
+                  className="min-h-[100px]"
+                />
+              </div>
+
+              {/* Dependencies */}
+              <div className="space-y-2">
+                <Label>Dependencies</Label>
+                <DependenceEditor
+                  dependencies={createFormData.dependOn || []}
+                  onChange={(dependencies) => setCreateFormData(prev => ({ ...prev, dependOn: dependencies }))}
+                />
+              </div>
+
+              {/* Conditions */}
+              <div className="space-y-2">
+                <Label>Conditions</Label>
+                <ConditionEditor
+                  conditions={createFormData.conditions || []}
+                  onChange={(conditions) => setCreateFormData(prev => ({ ...prev, conditions }))}
+                />
+              </div>
+
+              {/* JSON Columns */}
+              <div className="space-y-2">
+                <Label>JSON Columns</Label>
+                <JsonColumnEditor
+                  jsonColumns={createFormData.jsonColumns || []}
+                  onChange={(jsonColumns) => setCreateFormData(prev => ({ ...prev, jsonColumns }))}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Flags and Data Source */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium border-b pb-2">Flags and Data Source</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="ignored-columns">Ignored Columns</Label>
+                  <Label htmlFor="dataSourceId">Data Source ID</Label>
                   <Input
-                    id="ignored-columns"
+                    id="dataSourceId"
+                    value={createFormData.dataSourceId}
+                    onChange={(e) => setCreateFormData(prev => ({ ...prev, dataSourceId: e.target.value }))}
+                    placeholder="Enter data source ID"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ignoredColumns">Ignored Columns</Label>
+                  <Input
+                    id="ignoredColumns"
                     value={createFormData.ignoredColumns?.join(', ') || ''}
                     onChange={(e) => setCreateFormData(prev => ({ 
                       ...prev, 
@@ -1441,44 +1704,21 @@ const Tables = () => {
                     placeholder="Enter ignored columns (comma separated)"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="data-source-id">Data Source ID</Label>
-                  <Input
-                    id="data-source-id"
-                    value={createFormData.dataSourceId}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, dataSourceId: e.target.value }))}
-                    placeholder="Enter data source ID"
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="isList"
+                    checked={createFormData.isList || false}
+                    onCheckedChange={(checked) => setCreateFormData(prev => ({ ...prev, isList: !!checked }))}
                   />
+                  <Label htmlFor="isList">Is List</Label>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="is-list">Is List</Label>
-                  <Select 
-                    value={createFormData.isList ? 'true' : 'false'} 
-                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, isList: value === 'true' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select list status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="false">No</SelectItem>
-                      <SelectItem value="true">Yes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="triggered"
+                    checked={createFormData.triggered || false}
+                    onCheckedChange={(checked) => setCreateFormData(prev => ({ ...prev, triggered: !!checked }))}
+                  />
                   <Label htmlFor="triggered">Triggered</Label>
-                  <Select 
-                    value={createFormData.triggered ? 'true' : 'false'} 
-                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, triggered: value === 'true' }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select trigger status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="false">No</SelectItem>
-                      <SelectItem value="true">Yes</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </div>

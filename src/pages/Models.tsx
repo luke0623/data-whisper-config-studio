@@ -8,15 +8,22 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Edit, Trash2, Database, Loader2, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { Plus, Edit, Database, Loader2, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/context/AuthContext';
 import { Model } from '@/models/model';
+import { Module } from '@/models/module';
 import { modelService } from '@/services/modelService';
+import { moduleService } from '@/services/moduleService';
 
 const Models = () => {
+  // Auth context
+  const { user } = useAuth();
+  
   const [models, setModels] = useState<Model[]>([]);
+  const [availableModules, setAvailableModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -39,23 +46,27 @@ const Models = () => {
   const [totalCount, setTotalCount] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(6); // Number of models displayed per page
 
-  // Fetch models on component mount
+  // Fetch models and modules on component mount
   useEffect(() => {
-    const fetchModels = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const fetchedModels = await modelService.findAllModels();
+        const [fetchedModels, fetchedModules] = await Promise.all([
+          modelService.getAllModels(),
+          moduleService.getAllModules()
+        ]);
         setModels(fetchedModels);
+        setAvailableModules(fetchedModules);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch models');
-        console.error('Error fetching models:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch data');
+        console.error('Error fetching data:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchModels();
+    fetchData();
   }, []);
 
   // Pagination calculation logic
@@ -75,6 +86,11 @@ const Models = () => {
       setCurrentPage(1);
     }
   }, [totalFilteredCount, calculatedTotalPages, currentPage, pageSize]);
+
+  // Generate UUID with 'f-' prefix for model ID
+  const generateModelId = (): string => {
+    return `f-${crypto.randomUUID()}`;
+  };
 
   // Pagination control functions
   const handlePageChange = (page: number) => {
@@ -103,15 +119,14 @@ const Models = () => {
   // Reset create form
   const resetCreateForm = () => {
     setCreateFormData({
-      modelId: '',
+      modelId: generateModelId(),
       modelName: '',
       dependOn: '',
       rawTopicCode: '',
       isParalleled: false,
-      version: '1.0.0',
-      tenantId: 'tenant_001',
-      createdBy: 'current_user',
-      lastModifiedBy: 'current_user',
+      tenantId: user?.tenantId || '',
+      createdBy: user?.name || 'current_user',
+      lastModifiedBy: user?.name || 'current_user',
       moduleId: '',
       priority: 1
     });
@@ -119,7 +134,7 @@ const Models = () => {
     setSuccessMessage(null);
   };
 
-  // Validate form data
+  // Validate form data for create mode
   const validateForm = (formData: Partial<Model>): boolean => {
     const errors: {[key: string]: string} = {};
 
@@ -129,10 +144,23 @@ const Models = () => {
       errors.modelName = 'Model name must be at least 2 characters';
     }
 
-    if (!formData.modelId?.trim()) {
-      errors.modelId = 'Model ID cannot be empty';
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(formData.modelId)) {
-      errors.modelId = 'Model ID can only contain letters, numbers, underscores and hyphens';
+    // Model ID validation removed since it's auto-generated
+
+    if (!formData.moduleId?.trim()) {
+      errors.moduleId = 'Module ID cannot be empty';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const validateEditForm = (formData: Partial<Model>): boolean => {
+    const errors: {[key: string]: string} = {};
+
+    if (!formData.modelName?.trim()) {
+      errors.modelName = 'Model name cannot be empty';
+    } else if (formData.modelName.length < 2) {
+      errors.modelName = 'Model name must be at least 2 characters';
     }
 
     if (!formData.moduleId?.trim()) {
@@ -149,6 +177,7 @@ const Models = () => {
   };
 
   const handleEdit = (model: Model) => {
+    console.log('Edit button clicked for model:', model.modelName);
     setSelectedModel(model);
     setEditFormData(model);
     setEditDialogOpen(true);
@@ -166,17 +195,29 @@ const Models = () => {
         return;
       }
 
-      const now = new Date().toISOString();
-      const modelData = {
-        ...createFormData,
-        createdAt: now,
-        lastModifiedAt: now
-      } as Model;
+      // Prepare data for service call (including frontend-generated modelId)
+      const createData = {
+        modelId: createFormData.modelId!,
+        modelName: createFormData.modelName!,
+        dependOn: createFormData.dependOn || '',
+        rawTopicCode: createFormData.rawTopicCode || '',
+        isParalleled: createFormData.isParalleled || false,
+        version: '1.0.0', // Default version for new models
+        tenantId: user?.tenantId || createFormData.tenantId || '',
+        createdBy: user?.name || 'current_user',
+        lastModifiedBy: user?.name || 'current_user',
+        moduleId: createFormData.moduleId!,
+        priority: createFormData.priority || 1
+      };
 
-      setModels(prev => [...prev, modelData]);
+      // Call service layer to create model
+      const createdModel = await modelService.createModel(createData);
+      
+      // Update local state with the created model
+      setModels(prev => [...prev, createdModel]);
       setCreateDialogOpen(false);
       resetCreateForm();
-      setSuccessMessage(`Model "${createFormData.modelName}" created successfully!`);
+      setSuccessMessage(`Model "${createdModel.modelName}" created successfully!`);
       
       toast({
         title: "Model Created",
@@ -193,28 +234,50 @@ const Models = () => {
   };
 
   const handleSaveEdit = async () => {
-    if (!selectedModel || !editFormData) return;
+    console.log('handleSaveEdit called');
+    if (!selectedModel || !editFormData) {
+      console.log('No selected model or edit form data');
+      return;
+    }
 
     try {
+      console.log('Starting edit process for model:', selectedModel.modelId);
       setEditLoading(true);
       setError(null);
 
-      if (!validateForm(editFormData)) {
+      if (!validateEditForm(editFormData)) {
+        console.log('Form validation failed');
         setEditLoading(false);
         return;
       }
 
-      const now = new Date().toISOString();
-      const modelData = {
-        ...editFormData,
-        lastModifiedAt: now
-      } as Model;
+      // Prepare data for service call (excluding modelId, createdAt, createdBy)
+      const updateData = {
+        modelName: editFormData.modelName,
+        dependOn: editFormData.dependOn,
+        rawTopicCode: editFormData.rawTopicCode,
+        isParalleled: editFormData.isParalleled,
+        version: editFormData.version,
+        tenantId: editFormData.tenantId,
+        lastModifiedBy: user?.name || 'current_user',
+        moduleId: editFormData.moduleId,
+        priority: editFormData.priority
+      };
 
-      setModels(prev => prev.map(m => m.modelId === selectedModel.modelId ? modelData : m));
+      console.log('Update data prepared:', updateData);
+      console.log('Calling modelService.updateModel...');
+      
+      // Call service layer to update model
+      const updatedModel = await modelService.updateModel(selectedModel.modelId, updateData);
+      
+      console.log('Model updated successfully:', updatedModel);
+      
+      // Update local state with the updated model
+      setModels(prev => prev.map(m => m.modelId === selectedModel.modelId ? updatedModel : m));
       setEditDialogOpen(false);
       setSelectedModel(null);
       setEditFormData({});
-      setSuccessMessage(`Model "${editFormData.modelName}" updated successfully!`);
+      setSuccessMessage(`Model "${updatedModel.modelName}" updated successfully!`);
       
       toast({
         title: "Model Updated",
@@ -223,36 +286,11 @@ const Models = () => {
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
+      console.error('Error in handleSaveEdit:', err);
       setError('Failed to update model. Please try again.');
       console.error('Failed to update model:', err);
     } finally {
       setEditLoading(false);
-    }
-  };
-
-  const handleDelete = async (modelId: string) => {
-    if (!confirm('Are you sure you want to delete this model? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      setModels(prev => prev.filter(m => m.modelId !== modelId));
-      setSuccessMessage('Model deleted successfully!');
-      
-      toast({
-        title: "Model Deleted",
-        description: "Model has been deleted successfully."
-      });
-
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
-      setError('Failed to delete model. Please try again.');
-      console.error('Failed to delete model:', err);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -352,15 +390,11 @@ const Models = () => {
                 <Button variant="outline" size="sm" onClick={() => handleEdit(model)}>
                   <Edit className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDelete(model.modelId)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
               </div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Badge variant="outline">Priority: {model.priority}</Badge>
-                <Badge variant="outline">v{model.version}</Badge>
                 {model.isParalleled && <Badge variant="secondary">Paralleled</Badge>}
               </div>
               {/* <p className="text-sm text-gray-600">Module: {model.moduleId}</p> */}
@@ -475,17 +509,21 @@ const Models = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Model</DialogTitle>
+            <DialogDescription>
+              Fill in the information below to create a new model. Fields marked with * are required.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="create-modelId">Model ID *</Label>
+              <Label htmlFor="create-modelId">Model ID</Label>
               <Input
                 id="create-modelId"
                 value={createFormData.modelId || ''}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, modelId: e.target.value }))}
-                placeholder="Enter model ID"
+                readOnly
+                className="bg-gray-50 cursor-not-allowed"
+                placeholder="Auto-generated"
               />
-              {formErrors.modelId && <p className="text-sm text-red-600">{formErrors.modelId}</p>}
+              <p className="text-xs text-gray-500">Automatically generated with 'f-' prefix</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="create-modelName">Model Name *</Label>
@@ -499,12 +537,21 @@ const Models = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="create-moduleId">Module ID *</Label>
-              <Input
-                id="create-moduleId"
+              <Select
                 value={createFormData.moduleId || ''}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, moduleId: e.target.value }))}
-                placeholder="Enter module ID"
-              />
+                onValueChange={(value) => setCreateFormData(prev => ({ ...prev, moduleId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a module" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModules.map((module) => (
+                    <SelectItem key={module.moduleId} value={module.moduleId}>
+                      {module.moduleName} ({module.moduleId})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.moduleId && <p className="text-sm text-red-600">{formErrors.moduleId}</p>}
             </div>
             <div className="space-y-2">
@@ -534,23 +581,7 @@ const Models = () => {
                 onChange={(e) => setCreateFormData(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-version">Version</Label>
-              <Input
-                id="create-version"
-                value={createFormData.version || ''}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, version: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-tenantId">Tenant ID</Label>
-              <Input
-                id="create-tenantId"
-                value={createFormData.tenantId || ''}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, tenantId: e.target.value }))}
-                placeholder="Enter tenant ID"
-              />
-            </div>
+
             <div className="flex items-center space-x-2 md:col-span-2">
               <Checkbox
                 id="create-isParalleled"
@@ -571,23 +602,15 @@ const Models = () => {
       </Dialog>
 
       {/* Edit Model Dialog */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen} key={selectedModel?.modelId || 'edit-dialog'}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Model</DialogTitle>
+            <DialogDescription>
+              Update the model information below. Fields marked with * are required.
+            </DialogDescription>
           </DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-modelId">Model ID *</Label>
-              <Input
-                id="edit-modelId"
-                value={editFormData.modelId || ''}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, modelId: e.target.value }))}
-                placeholder="Enter model ID"
-                disabled
-              />
-              {formErrors.modelId && <p className="text-sm text-red-600">{formErrors.modelId}</p>}
-            </div>
             <div className="space-y-2">
               <Label htmlFor="edit-modelName">Model Name *</Label>
               <Input
@@ -600,12 +623,21 @@ const Models = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-moduleId">Module ID *</Label>
-              <Input
-                id="edit-moduleId"
+              <Select
                 value={editFormData.moduleId || ''}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, moduleId: e.target.value }))}
-                placeholder="Enter module ID"
-              />
+                onValueChange={(value) => setEditFormData(prev => ({ ...prev, moduleId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a module" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableModules.map((module) => (
+                    <SelectItem key={module.moduleId} value={module.moduleId}>
+                      {module.moduleName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {formErrors.moduleId && <p className="text-sm text-red-600">{formErrors.moduleId}</p>}
             </div>
             <div className="space-y-2">
@@ -635,23 +667,7 @@ const Models = () => {
                 onChange={(e) => setEditFormData(prev => ({ ...prev, priority: parseInt(e.target.value) }))}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-version">Version</Label>
-              <Input
-                id="edit-version"
-                value={editFormData.version || ''}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, version: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-tenantId">Tenant ID</Label>
-              <Input
-                id="edit-tenantId"
-                value={editFormData.tenantId || ''}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, tenantId: e.target.value }))}
-                placeholder="Enter tenant ID"
-              />
-            </div>
+
             <div className="flex items-center space-x-2 md:col-span-2">
               <Checkbox
                 id="edit-isParalleled"

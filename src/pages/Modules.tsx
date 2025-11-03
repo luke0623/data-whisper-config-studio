@@ -1,6 +1,7 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Layers, GitBranch, Loader2, X } from 'lucide-react';
+import { Plus, Edit, Layers, GitBranch, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -12,10 +13,14 @@ import { Module, CreateModuleRequest, UpdateModuleRequest } from '../models/modu
 import { moduleService } from '../services/moduleService';
 import { toast } from '@/hooks/use-toast';
 import { ExecutionFlowDiagram } from '../components/flow/ExecutionFlowDiagram';
+import { useAuth } from '@/context/AuthContext';
 
 
 
 const Modules: React.FC = () => {
+  // Auth context
+  const { user } = useAuth();
+  
   // State management
   const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,16 +83,20 @@ const Modules: React.FC = () => {
     }
   }, [error]);
 
+  // Generate UUID with 'f-' prefix for module ID
+  const generateModuleId = (): string => {
+    return `f-${crypto.randomUUID()}`;
+  };
+
   // Reset create form
   const resetCreateForm = () => {
     setCreateFormData({
-      moduleId: '',
+      moduleId: generateModuleId(),
       moduleName: '',
       priority: 1,
-      version: '1.0.0',
-      tenantId: 'tenant_001',
-      createdBy: 'current_user',
-      lastModifiedBy: 'current_user'
+      tenantId: user?.tenantId || '',
+      createdBy: user?.name || 'current_user',
+      lastModifiedBy: user?.name || 'current_user'
     });
     setFormErrors({});
     setSuccessMessage(null);
@@ -103,11 +112,7 @@ const Modules: React.FC = () => {
       errors.moduleName = 'Module name must be at least 2 characters';
     }
 
-    if (!formData.moduleId?.trim()) {
-      errors.moduleId = 'Module ID cannot be empty';
-    } else if (!/^[a-zA-Z0-9_-]+$/.test(formData.moduleId)) {
-      errors.moduleId = 'Module ID can only contain letters, numbers, underscores and hyphens';
-    }
+    // Module ID validation removed since it's auto-generated
 
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -144,7 +149,7 @@ const Modules: React.FC = () => {
         priority: createFormData.priority!,
         version: createFormData.version!,
         tenantId: createFormData.tenantId!,
-        createdBy: 'current_user'
+        createdBy: user?.name || 'current_user'
       };
 
       const newModule = await moduleService.createModule(createRequest);
@@ -187,7 +192,8 @@ const Modules: React.FC = () => {
       const now = new Date().toISOString();
       const moduleData = {
         ...editFormData,
-        lastModifiedAt: now
+        lastModifiedAt: now,
+        lastModifiedBy: user?.name || 'current_user'
       } as Module;
 
       await moduleService.updateModule(selectedModule.moduleId, moduleData);
@@ -214,26 +220,6 @@ const Modules: React.FC = () => {
       });
     } finally {
       setEditLoading(false);
-    }
-  };
-
-  const handleDelete = async (moduleId: string) => {
-    try {
-      await moduleService.deleteModule(moduleId);
-      setModules(prev => prev.filter(m => m.moduleId !== moduleId));
-      setSuccessMessage('Module deleted successfully');
-      toast({
-        title: "Module Deleted",
-        description: "Module has been deleted successfully."
-      });
-    } catch (err) {
-      console.error('Failed to delete module:', err);
-      setError('Failed to delete module. Please try again.');
-      toast({
-        title: "Error",
-        description: "Failed to delete module. Please try again.",
-        variant: "destructive"
-      });
     }
   };
 
@@ -378,14 +364,6 @@ const Modules: React.FC = () => {
                   >
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => handleDelete(module.moduleId)}
-                    className="hover:bg-red-50 hover:border-red-300 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               </div>
               <div className="space-y-3">
@@ -419,17 +397,14 @@ const Modules: React.FC = () => {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="create-moduleId">Module ID *</Label>
+              <Label htmlFor="create-moduleId">Module ID (Auto-generated)</Label>
               <Input
                 id="create-moduleId"
                 value={createFormData.moduleId}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, moduleId: e.target.value }))}
-                placeholder="e.g., user-management"
-                className={formErrors.moduleId ? "border-red-500" : ""}
+                readOnly
+                className="bg-gray-50 cursor-not-allowed"
               />
-              {formErrors.moduleId && (
-                <p className="text-sm text-red-600">{formErrors.moduleId}</p>
-              )}
+              <p className="text-xs text-gray-500">Module ID is automatically generated with 'f-' prefix</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="create-moduleName">Module Name *</Label>
@@ -444,34 +419,14 @@ const Modules: React.FC = () => {
                 <p className="text-sm text-red-600">{formErrors.moduleName}</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="create-priority">Priority</Label>
-                <Input
-                  id="create-priority"
-                  type="number"
-                  value={createFormData.priority}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, priority: parseInt(e.target.value) || 1 }))}
-                  min="1"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="create-version">Version</Label>
-                <Input
-                  id="create-version"
-                  value={createFormData.version}
-                  onChange={(e) => setCreateFormData(prev => ({ ...prev, version: e.target.value }))}
-                  placeholder="1.0.0"
-                />
-              </div>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="create-tenantId">Tenant ID</Label>
+              <Label htmlFor="create-priority">Priority</Label>
               <Input
-                id="create-tenantId"
-                value={createFormData.tenantId}
-                onChange={(e) => setCreateFormData(prev => ({ ...prev, tenantId: e.target.value }))}
-                placeholder="default"
+                id="create-priority"
+                type="number"
+                value={createFormData.priority}
+                onChange={(e) => setCreateFormData(prev => ({ ...prev, priority: parseInt(e.target.value) || 1 }))}
+                min="1"
               />
             </div>
           </div>
@@ -526,32 +481,14 @@ const Modules: React.FC = () => {
                 <p className="text-sm text-red-600">{formErrors.moduleName}</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-priority">Priority</Label>
-                <Input
-                  id="edit-priority"
-                  type="number"
-                  value={editFormData.priority}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, priority: parseInt(e.target.value) || 1 }))}
-                  min="1"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-version">Version</Label>
-                <Input
-                  id="edit-version"
-                  value={editFormData.version}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, version: e.target.value }))}
-                />
-              </div>
-            </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-tenantId">Tenant ID</Label>
+              <Label htmlFor="edit-priority">Priority</Label>
               <Input
-                id="edit-tenantId"
-                value={editFormData.tenantId}
-                onChange={(e) => setEditFormData(prev => ({ ...prev, tenantId: e.target.value }))}
+                id="edit-priority"
+                type="number"
+                value={editFormData.priority}
+                onChange={(e) => setEditFormData(prev => ({ ...prev, priority: parseInt(e.target.value) || 1 }))}
+                min="1"
               />
             </div>
           </div>

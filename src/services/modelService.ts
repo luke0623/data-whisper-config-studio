@@ -3,16 +3,6 @@ import { API_BASE_URL } from '../utils/apiConfig';
 import { authService } from './authService';
 
 /**
- * API Response Interface
- */
-interface ApiResponse<T> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
-}
-
-/**
  * Pagination Query Parameters
  */
 interface PaginationParams {
@@ -21,58 +11,61 @@ interface PaginationParams {
   sortBy?: keyof Model;
   sortOrder?: 'asc' | 'desc';
   search?: string;
+  tenantId?: string;
 }
 
 /**
  * Paginated Response Data
  */
 interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
 }
 
 /**
  * Create Model Request Data (excluding auto-generated fields)
  */
-type CreateModelRequest = Omit<Model, 'modelId' | 'createdAt' | 'lastModifiedAt'>;
+type CreateModelRequest = Omit<Model, 'createdAt' | 'lastModifiedAt'>;
 
 /**
  * Update Model Request Data (partial fields optional)
  */
-type UpdateModelRequest = Partial<Omit<Model, 'modelId' | 'createdAt' | 'createdBy'>>;
+type UpdateModelRequest = Partial<Omit<Model,  'createdAt' | 'createdBy'>>;
 
 /**
- * Custom Error Class for Model Service
+ * Model Statistics
  */
-export class ModelServiceError extends Error {
-  constructor(
-    message: string,
-    public statusCode?: number,
-    public originalError?: Error
-  ) {
-    super(message);
-    this.name = 'ModelServiceError';
-  }
+interface ModelStats {
+  total: number;
+  byTenant: Record<string, number>;
+  byModule: Record<string, number>;
+  byVersion: Record<string, number>;
+  recentlyCreated: number;
+  recentlyModified: number;
 }
 
-export const getDefaultHeaders = () => {
-  // Get token from logged-in user via authService
-  const token = authService.getStoredToken();
- 
-  return {
-    'Content-Type': 'application/json',
-    'Accept': '*/*',
-    'Authorization': `Bearer ${token}`,
-  };
-};
+/**
+ * Batch Operation Result
+ */
+interface BatchOperationResult {
+  success: string[];
+  failed: Array<{ id: string; error: string }>;
+  total: number;
+  successCount: number;
+  failedCount: number;
+}
 
 /**
- * Mock data for fallback when API is unavailable
+ * Mock data for development and testing
  */
-const MOCK_MODELS: Model[] = [
+const mockModels: Model[] = [
   {
     modelId: 'policy_001',
     modelName: 'Policy',
@@ -120,9 +113,53 @@ const MOCK_MODELS: Model[] = [
   }
 ];
 
+const mockModelStats: ModelStats = {
+  total: 3,
+  byTenant: {
+    'tenant_001': 3
+  },
+  byModule: {
+    'policy_mgmt_001': 1,
+    'customer_mgmt_001': 1,
+    'order_mgmt_001': 1
+  },
+  byVersion: {
+    '1.0.0': 1,
+    '1.1.0': 1,
+    '1.2.0': 1
+  },
+  recentlyCreated: 3,
+  recentlyModified: 3
+};
+
 /**
- * Model Data Access Service Class
- * Implements complete CRUD operations using native fetch API
+ * Custom Error Class for Model Service
+ */
+export class ModelServiceError extends Error {
+  constructor(
+    message: string,
+    public statusCode?: number,
+    public originalError?: Error
+  ) {
+    super(message);
+    this.name = 'ModelServiceError';
+  }
+}
+
+export const getDefaultHeaders = () => {
+  // Get token from logged-in user via authService
+  const token = authService.getStoredToken();
+ 
+  return {
+    'Content-Type': 'application/json',
+    'Accept': '*/*',
+    'Authorization': `Bearer ${token}`,
+  };
+};
+
+/**
+ * Model Service Class
+ * Following the moduleService.ts pattern
  */
 export class ModelService {
   private useMockData: boolean;
@@ -132,131 +169,44 @@ export class ModelService {
   }
 
   /**
-   * Generic HTTP Request Method
+   * Get all models (matches server endpoint: /ingest/config/model/all)
    */
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    const url = `${API_BASE_URL}/watchmen/ingest/config/model${endpoint}`;
-    
+  async getAllModels(): Promise<Model[]> {
+    if (this.useMockData) {
+      return mockModels;
+    }
+
     try {
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...getDefaultHeaders(),
-          ...options.headers,
-        },
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/all`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
       });
 
-      // 检查 HTTP 状态码
       if (!response.ok) {
-        const errorText = await response.text();
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        
-        try {
-          const errorData = JSON.parse(errorText);
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch {
-          // If not JSON format, use original error text
-          errorMessage = errorText || errorMessage;
-        }
-        
-        throw new ModelServiceError(errorMessage, response.status);
-      }
-
-      // 解析响应数据
-      const data = await response.json();
-      return {
-        success: true,
-        data,
-        message: data.message
-      };
-    } catch (error) {
-      if (error instanceof ModelServiceError) {
-        throw error;
-      }
-      
-      throw new ModelServiceError(
-        `Network request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        undefined,
-        error instanceof Error ? error : undefined
-      );
-    }
-  }
-
-  /**
-   * Get All Models (Paginated)
-   */
-  async getAllModels(params: PaginationParams = {}): Promise<PaginatedResponse<Model>> {
-    if (this.useMockData) {
-      // Apply client-side filtering and pagination for mock data
-      let filteredModels = MOCK_MODELS;
-      
-      // Apply search filter
-      if (params.search) {
-        const searchLower = params.search.toLowerCase();
-        filteredModels = filteredModels.filter(model => 
-          (model.modelName || '').toLowerCase().includes(searchLower) ||
-          (model.dependOn || '').toLowerCase().includes(searchLower) ||
-          (model.rawTopicCode || '').toLowerCase().includes(searchLower)
+        throw new ModelServiceError(
+          `Failed to fetch models: ${response.status} ${response.statusText}`,
+          response.status
         );
       }
       
-      // Apply sorting
-      if (params.sortBy) {
-        filteredModels.sort((a, b) => {
-          const aValue = a[params.sortBy as keyof Model];
-          const bValue = b[params.sortBy as keyof Model];
-          
-          if (aValue < bValue) return params.sortOrder === 'desc' ? 1 : -1;
-          if (aValue > bValue) return params.sortOrder === 'desc' ? -1 : 1;
-          return 0;
-        });
+      const data = await response.json();
+      
+      // Handle different response formats
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data.success && data.data && Array.isArray(data.data)) {
+        return data.data;
+      } else if (data.data && Array.isArray(data.data)) {
+        return data.data;
+      } else {
+        console.warn('[ModelService] Invalid response format, falling back to mock data');
+        return mockModels;
       }
-      
-      // Apply pagination
-      const { page = 1, limit = 10 } = params;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const items = filteredModels.slice(startIndex, endIndex);
-      
-      return {
-        items,
-        total: filteredModels.length,
-        page,
-        limit,
-        totalPages: Math.ceil(filteredModels.length / limit)
-      };
-    }
-
-    const queryParams = new URLSearchParams();
-    
-    if (params.page) queryParams.append('page', params.page.toString());
-    if (params.limit) queryParams.append('limit', params.limit.toString());
-    if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
-    if (params.search) queryParams.append('search', params.search);
-    
-    // Default sort by creation time
-    if (!params.sortBy) {
-      queryParams.append('sortBy', 'createdAt');
-      queryParams.append('sortOrder', 'desc');
-    }
-
-    try {
-      const response = await this.request<PaginatedResponse<Model>>(`?${queryParams}`);
-      
-      if (!response.success || !response.data) {
-        throw new ModelServiceError(response.error || 'Failed to get model list');
-      }
-      
-      return response.data;
     } catch (error) {
       console.error('Error fetching models:', error);
       // Fallback to mock data if enabled
       if (this.useMockData) {
-        return this.getAllModels(params);
+        return mockModels;
       }
       throw new ModelServiceError(
         'Failed to fetch models',
@@ -267,96 +217,89 @@ export class ModelService {
   }
 
   /**
-   * Get mock models data
-   * @returns Model[] - Array of mock models
+   * Get all models with pagination (for backward compatibility)
    */
-  getMockModels(): Model[] {
-    return MOCK_MODELS;
-  }
-
-  /**
-   * Find All Models (No Pagination)
-   * Uses the /watchmen/ingest/config/model/all endpoint to retrieve all models
-   */
-  async findAllModels(): Promise<Model[]> {
-    console.log('[ModelService] Starting findAllModels request');
+  async getAllModelsWithPagination(params: PaginationParams = {}): Promise<PaginatedResponse<Model>> {
+    const allModels = await this.getAllModels();
     
-    try {
-      const url = `${API_BASE_URL}/watchmen/ingest/config/model/all`;
-      console.log('[ModelService] Making request to:', url);
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: getDefaultHeaders()
-      });
-
-      console.log('[ModelService] Response status:', response.status, response.statusText);
-
-      // Check HTTP status code
-      if (!response.ok) {
-        throw new ModelServiceError(
-          `Failed to fetch models: ${response.status} ${response.statusText}`,
-          response.status
-        );
-      }
-
-      // Parse response data
-      const data = await response.json();
-      console.log('[ModelService] Raw response data:', data);
-      
-      // Handle different response formats
-      if (Array.isArray(data)) {
-        console.log('[ModelService] Response is array, returning directly:', data.length, 'items');
-        return data;
-      } else if (data.data && Array.isArray(data.data)) {
-        console.log('[ModelService] Response has data array:', data.data.length, 'items');
-        return data.data;
-      } else if (data.success && data.data && Array.isArray(data.data)) {
-        console.log('[ModelService] Response has success.data array:', data.data.length, 'items');
-        return data.data;
-      } else {
-        console.warn('[ModelService] Invalid response format, falling back to mock data');
-        const mockData = this.getMockModels();
-        console.log('[ModelService] Using mock data:', mockData.length, 'items');
-        return mockData;
-      }
-    } catch (error) {
-      console.warn(`[ModelService] Network error: ${error instanceof Error ? error.message : 'Unknown error'}, falling back to mock data`);
-      const mockData = this.getMockModels();
-      console.log('[ModelService] Using mock data due to error:', mockData.length, 'items');
-      return mockData;
+    // Apply client-side filtering and pagination
+    let filteredModels = allModels;
+    
+    // Apply search filter
+    if (params.search) {
+      const searchLower = params.search.toLowerCase();
+      filteredModels = filteredModels.filter(model => 
+        (model.modelName || '').toLowerCase().includes(searchLower) ||
+        (model.dependOn || '').toLowerCase().includes(searchLower) ||
+        (model.rawTopicCode || '').toLowerCase().includes(searchLower)
+      );
     }
+    
+    // Apply tenant filter
+    if (params.tenantId) {
+      filteredModels = filteredModels.filter(model => model.tenantId === params.tenantId);
+    }
+    
+    // Apply sorting
+    if (params.sortBy) {
+      filteredModels.sort((a, b) => {
+        const aValue = a[params.sortBy as keyof Model];
+        const bValue = b[params.sortBy as keyof Model];
+        
+        if (aValue < bValue) return params.sortOrder === 'desc' ? 1 : -1;
+        if (aValue > bValue) return params.sortOrder === 'desc' ? -1 : 1;
+        return 0;
+      });
+    }
+    
+    // Apply pagination
+    const { page = 1, limit = 10 } = params;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const data = filteredModels.slice(startIndex, endIndex);
+    
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total: filteredModels.length,
+        totalPages: Math.ceil(filteredModels.length / limit),
+        hasNext: page < Math.ceil(filteredModels.length / limit),
+        hasPrev: page > 1
+      }
+    };
   }
 
   /**
-   * Get Model by ID
+   * Get model by ID
    */
   async getModelById(modelId: string): Promise<Model> {
-    if (!modelId) {
-      throw new ModelServiceError('Model ID cannot be empty');
-    }
-
     if (this.useMockData) {
-      const model = MOCK_MODELS.find(m => m.modelId === modelId);
-      if (!model) {
-        throw new ModelServiceError(`Model with ID ${modelId} not found`, 404);
-      }
+      const model = mockModels.find(m => m.modelId === modelId);
+      if (!model) throw new ModelServiceError('Model not found', 404);
       return model;
     }
 
     try {
-      const response = await this.request<Model>(`/${encodeURIComponent(modelId)}`);
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/${encodeURIComponent(modelId)}`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
       
-      if (!response.success || !response.data) {
-        throw new ModelServiceError(response.error || 'Failed to get model details');
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to fetch model: ${response.status} ${response.statusText}`,
+          response.status
+        );
       }
       
-      return response.data;
+      return await response.json();
     } catch (error) {
       console.error('Error fetching model details:', error);
       if (this.useMockData) {
-        const model = MOCK_MODELS.find(m => m.modelId === modelId);
-        if (!model) throw new ModelServiceError(`Model with ID ${modelId} not found`, 404);
+        const model = mockModels.find(m => m.modelId === modelId);
+        if (!model) throw new ModelServiceError('Model not found', 404);
         return model;
       }
       throw error;
@@ -364,125 +307,280 @@ export class ModelService {
   }
 
   /**
-   * Create New Model
+   * Create new model
    */
-  async createModel(data: CreateModelRequest): Promise<Model> {
-    this.validateCreateModelRequest(data);
-
-    const response = await this.request<Model>('', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    
-    if (!response.success || !response.data) {
-      throw new ModelServiceError(response.error || 'Failed to create model');
+  async createModel(modelData: CreateModelRequest): Promise<Model> {
+    if (this.useMockData) {
+      const newModel: Model = {
+        ...modelData,
+        createdAt: new Date().toISOString(),
+        lastModifiedAt: new Date().toISOString()
+      };
+      mockModels.push(newModel);
+      return newModel;
     }
-    
-    return response.data;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/`, {
+        method: 'POST',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify(modelData),
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to create model: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating model:', error);
+      if (this.useMockData) {
+        const newModel: Model = {
+          ...modelData,
+          createdAt: new Date().toISOString(),
+          lastModifiedAt: new Date().toISOString()
+        };
+        mockModels.push(newModel);
+        return newModel;
+      }
+      throw error;
+    }
   }
 
   /**
-   * Update Model
+   * Update model
    */
-  async updateModel(id: string, data: UpdateModelRequest): Promise<Model> {
-    if (!id) {
-      throw new ModelServiceError('Model ID cannot be empty');
-    }
+  async updateModel(modelId: string, updateData: UpdateModelRequest): Promise<Model> {
+    console.log('ModelService.updateModel called with:', { modelId, updateData });
+    console.log('useMockData mode:', this.useMockData);
+    updateData.modelId = modelId;
     
-    this.validateUpdateModelRequest(data);
+    if (this.useMockData) {
+      console.log('Using mock data for update');
+      const modelIndex = mockModels.findIndex(m => m.modelId === modelId);
+      if (modelIndex === -1) throw new ModelServiceError('Model not found', 404);
+      
+      mockModels[modelIndex] = {
+        ...mockModels[modelIndex],
+        ...updateData,
+        lastModifiedAt: new Date().toISOString()
+      };
+      return mockModels[modelIndex];
+    }
 
-    const response = await this.request<Model>(`/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...data,
-        lastModifiedAt: new Date().toISOString(),
-      }),
-    });
-    
-    if (!response.success || !response.data) {
-      throw new ModelServiceError(response.error || 'Failed to update model');
+    try {
+      // console.log('Making API call to:', `${API_BASE_URL}/watchmen/ingest/config/model`);
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/`, {
+        method: 'POST',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify({
+          ...updateData,
+          lastModifiedAt: new Date().toISOString()
+        }),
+      });
+      
+      console.log('API response status:', response.status);
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to update model: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      
+      const result = await response.json();
+      console.log('API response data:', result);
+      return result;
+    } catch (error) {
+      console.error('Error updating model:', error);
+      console.log('Falling back to mock data due to error');
+      // if (this.useMockData) {
+      //   const modelIndex = mockModels.findIndex(m => m.modelId === modelId);
+      //   if (modelIndex === -1) throw new ModelServiceError('Model not found', 404);
+        
+      //   mockModels[modelIndex] = {
+      //     ...mockModels[modelIndex],
+      //     ...updateData,
+      //     lastModifiedAt: new Date().toISOString()
+      //   };
+      //   return mockModels[modelIndex];
+      // }
+      throw error;
     }
-    
-    return response.data;
   }
 
   /**
-   * Delete Model
+   * Delete model
    */
   async deleteModel(modelId: string): Promise<void> {
-    if (!modelId) {
-      throw new ModelServiceError('Model ID cannot be empty');
+    if (this.useMockData) {
+      const modelIndex = mockModels.findIndex(m => m.modelId === modelId);
+      if (modelIndex === -1) throw new ModelServiceError('Model not found', 404);
+      mockModels.splice(modelIndex, 1);
+      return;
     }
 
-    const response = await this.request<void>(`/${encodeURIComponent(modelId)}`, {
-      method: 'DELETE',
-    });
-    
-    if (!response.success) {
-      throw new ModelServiceError(response.error || 'Failed to delete model');
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/${encodeURIComponent(modelId)}`, {
+        method: 'DELETE',
+        headers: getDefaultHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to delete model: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+    } catch (error) {
+      console.error('Error deleting model:', error);
+      if (this.useMockData) {
+        const modelIndex = mockModels.findIndex(m => m.modelId === modelId);
+        if (modelIndex === -1) throw new ModelServiceError('Model not found', 404);
+        mockModels.splice(modelIndex, 1);
+        return;
+      }
+      throw error;
     }
   }
 
   /**
-   * 批量删除模型
+   * Delete multiple models
    */
-  async deleteModels(modelIds: string[]): Promise<void> {
-    if (!modelIds || modelIds.length === 0) {
-      throw new ModelServiceError('模型 ID 列表不能为空');
+  async deleteModels(modelIds: string[]): Promise<BatchOperationResult> {
+    if (this.useMockData) {
+      const success: string[] = [];
+      const failed: Array<{ id: string; error: string }> = [];
+      
+      modelIds.forEach(id => {
+        const modelIndex = mockModels.findIndex(m => m.modelId === id);
+        if (modelIndex !== -1) {
+          mockModels.splice(modelIndex, 1);
+          success.push(id);
+        } else {
+          failed.push({ id, error: 'Model not found' });
+        }
+      });
+      
+      return {
+        success,
+        failed,
+        total: modelIds.length,
+        successCount: success.length,
+        failedCount: failed.length
+      };
     }
 
-    const response = await this.request<void>('/batch', {
-      method: 'DELETE',
-      body: JSON.stringify({ modelIds }),
-    });
-    
-    if (!response.success) {
-      throw new ModelServiceError(response.error || '批量删除模型失败');
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/batch`, {
+        method: 'DELETE',
+        headers: getDefaultHeaders(),
+        body: JSON.stringify({ modelIds }),
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to delete models: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting models:', error);
+      if (this.useMockData) {
+        const success: string[] = [];
+        const failed: Array<{ id: string; error: string }> = [];
+        
+        modelIds.forEach(id => {
+          const modelIndex = mockModels.findIndex(m => m.modelId === id);
+          if (modelIndex !== -1) {
+            mockModels.splice(modelIndex, 1);
+            success.push(id);
+          } else {
+            failed.push({ id, error: 'Model not found' });
+          }
+        });
+        
+        return {
+          success,
+          failed,
+          total: modelIds.length,
+          successCount: success.length,
+          failedCount: failed.length
+        };
+      }
+      throw error;
     }
   }
 
   /**
-   * 根据模块 ID 获取模型列表
+   * Get models by module ID
    */
   async getModelsByModuleId(moduleId: string): Promise<Model[]> {
-    if (!moduleId) {
-      throw new ModelServiceError('模块 ID 不能为空');
+    if (this.useMockData) {
+      return mockModels.filter(model => model.moduleId === moduleId);
     }
 
-    const response = await this.request<Model[]>(`/module/${encodeURIComponent(moduleId)}`);
-    
-    if (!response.success || !response.data) {
-      throw new ModelServiceError(response.error || '获取模块模型列表失败');
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/module/${encodeURIComponent(moduleId)}`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to fetch models by module: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching models by module:', error);
+      if (this.useMockData) {
+        return mockModels.filter(model => model.moduleId === moduleId);
+      }
+      throw error;
     }
-    
-    return response.data;
   }
 
   /**
-   * 根据租户 ID 获取模型列表
+   * Get models by tenant ID
    */
   async getModelsByTenantId(tenantId: string): Promise<Model[]> {
-    if (!tenantId) {
-      throw new ModelServiceError('租户 ID 不能为空');
+    if (this.useMockData) {
+      return mockModels.filter(model => model.tenantId === tenantId);
     }
 
-    const response = await this.request<Model[]>(`/tenant/${encodeURIComponent(tenantId)}`);
-    
-    if (!response.success || !response.data) {
-      throw new ModelServiceError(response.error || '获取租户模型列表失败');
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/tenant/${encodeURIComponent(tenantId)}`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to fetch models by tenant: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching models by tenant:', error);
+      if (this.useMockData) {
+        return mockModels.filter(model => model.tenantId === tenantId);
+      }
+      throw error;
     }
-    
-    return response.data;
   }
 
   /**
-   * 搜索模型
+   * Search models
    */
   async searchModels(params: {
     query?: string;
@@ -491,6 +589,31 @@ export class ModelService {
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
   } = {}): Promise<{ models: Model[]; total: number; page: number; limit: number }> {
+    if (this.useMockData) {
+      let filteredModels = mockModels;
+      
+      if (params.query) {
+        const queryLower = params.query.toLowerCase();
+        filteredModels = filteredModels.filter(model => 
+          (model.modelName || '').toLowerCase().includes(queryLower) ||
+          (model.dependOn || '').toLowerCase().includes(queryLower) ||
+          (model.rawTopicCode || '').toLowerCase().includes(queryLower)
+        );
+      }
+      
+      const { page = 1, limit = 10 } = params;
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const models = filteredModels.slice(startIndex, endIndex);
+      
+      return {
+        models,
+        total: filteredModels.length,
+        page,
+        limit
+      };
+    }
+
     const queryParams = new URLSearchParams();
     
     if (params.query) queryParams.append('query', params.query);
@@ -499,73 +622,84 @@ export class ModelService {
     if (params.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
     
-    // 默认按创建时间排序
+    // Default sort by creation time
     if (!params.sortBy) {
       queryParams.append('sortBy', 'createdAt');
       queryParams.append('sortOrder', 'desc');
     }
 
-    const response = await this.request<{ models: Model[]; total: number; page: number; limit: number }>(`/search?${queryParams}`);
-    
-    if (!response.success || !response.data) {
-      throw new ModelServiceError(response.error || '搜索模型失败');
-    }
-    
-    return response.data;
-  }
-
-  /**
-   * Validate Create Model Request Data
-   */
-  private validateCreateModelRequest(data: CreateModelRequest): void {
-    const requiredFields = [
-      'modelName',
-      'dependOn',
-      'rawTopicCode',
-      'version',
-      'tenantId',
-      'createdBy',
-      'lastModifiedBy',
-      'moduleId',
-    ];
-
-    for (const field of requiredFields) {
-      if (!data[field as keyof CreateModelRequest]) {
-        throw new ModelServiceError(`${field} is a required field`);
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/search?${queryParams}`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to search models: ${response.status} ${response.statusText}`,
+          response.status
+        );
       }
-    }
-
-    if (typeof data.isParalleled !== 'boolean') {
-      throw new ModelServiceError('isParalleled must be a boolean value');
-    }
-
-    if (typeof data.priority !== 'number') {
-      throw new ModelServiceError('priority must be a number');
-    }
-
-    if (data.modelName.length > 255) {
-      throw new ModelServiceError('modelName length cannot exceed 255 characters');
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error searching models:', error);
+      if (this.useMockData) {
+        let filteredModels = mockModels;
+        
+        if (params.query) {
+          const queryLower = params.query.toLowerCase();
+          filteredModels = filteredModels.filter(model => 
+            (model.modelName || '').toLowerCase().includes(queryLower) ||
+            (model.dependOn || '').toLowerCase().includes(queryLower) ||
+            (model.rawTopicCode || '').toLowerCase().includes(queryLower)
+          );
+        }
+        
+        const { page = 1, limit = 10 } = params;
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const models = filteredModels.slice(startIndex, endIndex);
+        
+        return {
+          models,
+          total: filteredModels.length,
+          page,
+          limit
+        };
+      }
+      throw error;
     }
   }
 
   /**
-   * Validate Update Model Request Data
+   * Get model statistics
    */
-  private validateUpdateModelRequest(data: UpdateModelRequest): void {
-    if (data.modelName && data.modelName.length > 255) {
-      throw new ModelServiceError('modelName length cannot exceed 255 characters');
+  async getModelStats(): Promise<ModelStats> {
+    if (this.useMockData) {
+      return mockModelStats;
     }
 
-    if (data.isParalleled !== undefined && typeof data.isParalleled !== 'boolean') {
-      throw new ModelServiceError('isParalleled must be a boolean value');
-    }
-
-    if (data.priority !== undefined && typeof data.priority !== 'number') {
-      throw new ModelServiceError('priority must be a number');
-    }
-
-    if (data.lastModifiedBy && !data.lastModifiedBy.trim()) {
-      throw new ModelServiceError('lastModifiedBy cannot be empty');
+    try {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/stats`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
+      
+      if (!response.ok) {
+        throw new ModelServiceError(
+          `Failed to fetch model statistics: ${response.status} ${response.statusText}`,
+          response.status
+        );
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching model statistics:', error);
+      if (this.useMockData) {
+        return mockModelStats;
+      }
+      throw error;
     }
   }
 
@@ -592,7 +726,10 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/health`);
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/health`, {
+        method: 'GET',
+        headers: getDefaultHeaders()
+      });
       return response.ok;
     } catch {
       return false;
@@ -600,16 +737,15 @@ export class ModelService {
   }
 }
 
-// 导出默认实例
+// Create and export model service instance
 export const modelService = new ModelService();
 
-// ModelServiceError is already exported above
-
-// 导出类型
+// Export types
 export type {
-  ApiResponse,
   PaginationParams,
   PaginatedResponse,
   CreateModelRequest,
   UpdateModelRequest,
+  ModelStats,
+  BatchOperationResult,
 };

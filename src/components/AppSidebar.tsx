@@ -14,6 +14,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Database, Settings, Table, Layers, Home, Activity, Search } from 'lucide-react';
+import { FEATURE_FLAGS } from '@/App';
 
 const menuItems = [
   {
@@ -69,7 +70,15 @@ export function AppSidebar() {
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {menuItems
+                .filter(item => {
+                  // Hide Discovery menu item if feature flag is disabled
+                  if (item.title === 'Discovery' && !FEATURE_FLAGS.showDiscovery) {
+                    return false;
+                  }
+                  return true;
+                })
+                .map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton 
                     asChild 

@@ -5,11 +5,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, Sparkles, Save, Play, Loader2, ArrowRight } from 'lucide-react';
+import { CheckCircle, Sparkles, Play, Loader2, ArrowRight } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ModuleSelector from '@/components/ModuleSelector';
 import ModelSelector from '@/components/ModelSelector';
-import TableSelector from '@/components/TableSelector';
 import ConfigurationPreview from '@/components/ConfigurationPreview';
 import { configService } from '@/services';
 import { ConfigurationData } from '@/models';
@@ -17,53 +16,12 @@ import { ConfigurationData } from '@/models';
 const ConfigurationForm = () => {
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
-  const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [isAiEnabled, setIsAiEnabled] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [activeStep, setActiveStep] = useState(1);
 
-  const handleSaveConfiguration = async () => {
-    if (!selectedModule || !selectedModel || selectedTables.length === 0) {
-      toast({
-        title: "Incomplete Configuration",
-        description: "Please select a module, model, and at least one table.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsSaving(true);
-    
-    try {
-      // Prepare configuration data
-      const configData: ConfigurationData = {
-        module: selectedModule,
-        model: selectedModel,
-        tables: selectedTables,
-        aiEnabled: isAiEnabled
-      };
-      
-      // Call the service to save configuration
-      const response = await configService.saveConfiguration(configData);
-      
-      toast({
-        title: "Configuration Saved",
-        description: "Your data MO configuration has been saved successfully.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error Saving Configuration",
-        description: error.message || "An error occurred while saving the configuration.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const handleTestConfiguration = async () => {
-    if (!selectedModule || !selectedModel || selectedTables.length === 0) {
+    if (!selectedModule || !selectedModel) {
       toast({
         title: "Incomplete Configuration",
         description: "Please complete the configuration before testing.",
@@ -79,7 +37,7 @@ const ConfigurationForm = () => {
       const configData: ConfigurationData = {
         module: selectedModule,
         model: selectedModel,
-        tables: selectedTables,
+        tables: [], // Empty tables array since we removed table selection
         aiEnabled: isAiEnabled
       };
       
@@ -106,10 +64,10 @@ const ConfigurationForm = () => {
     }
   };
 
-  const isConfigurationComplete = selectedModule && selectedModel && selectedTables.length > 0;
+  const isConfigurationComplete = selectedModule && selectedModel;
   
   const handleNextStep = () => {
-    if (activeStep < 3) {
+    if (activeStep < 2) {
       setActiveStep(activeStep + 1);
     }
   };
@@ -146,7 +104,7 @@ const ConfigurationForm = () => {
         <div className="overflow-hidden h-2 mb-6 text-xs flex rounded bg-gray-200">
           <div 
             className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-blue-600 transition-all duration-500"
-            style={{ width: `${(activeStep / 3) * 100}%` }}
+            style={{ width: `${(activeStep / 2) * 100}%` }}
           ></div>
         </div>
         <div className="flex justify-between">
@@ -161,12 +119,6 @@ const ConfigurationForm = () => {
               {selectedModel ? <CheckCircle className="h-5 w-5" /> : "2"}
             </div>
             <div className="text-xs mt-1">Model</div>
-          </div>
-          <div className={`text-center ${activeStep >= 3 ? 'text-blue-600' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${activeStep >= 3 ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-              {selectedTables.length > 0 ? <CheckCircle className="h-5 w-5" /> : "3"}
-            </div>
-            <div className="text-xs mt-1">Tables</div>
           </div>
         </div>
       </div>
@@ -229,44 +181,6 @@ const ConfigurationForm = () => {
             >
               Back
             </Button>
-            <Button 
-              onClick={handleNextStep} 
-              disabled={!selectedModel}
-              className="gap-2"
-            >
-              Next Step
-              <ArrowRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Step 3: Table Selection */}
-        <div className={`space-y-4 transition-all duration-300 ${activeStep === 3 ? 'block' : 'hidden'}`}>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-semibold">
-              3
-            </div>
-            <Label className="text-lg font-semibold">Select Tables</Label>
-            {selectedTables.length > 0 && <CheckCircle className="h-5 w-5 text-green-600" />}
-          </div>
-          <Card className="border border-gray-200 shadow-sm hover:shadow-md transition-all duration-300">
-            <CardContent className="p-6">
-              <TableSelector
-                selectedModule={selectedModule}
-                selectedModel={selectedModel}
-                selectedTables={selectedTables}
-                onTablesSelect={setSelectedTables}
-                aiEnabled={isAiEnabled}
-              />
-            </CardContent>
-          </Card>
-          <div className="flex justify-between mt-4">
-            <Button 
-              variant="outline" 
-              onClick={handlePrevStep}
-            >
-              Back
-            </Button>
           </div>
         </div>
       </div>
@@ -281,7 +195,7 @@ const ConfigurationForm = () => {
           <ConfigurationPreview
             module={selectedModule}
             model={selectedModel}
-            tables={selectedTables}
+            tables={[]}
           />
         </Card>
       )}
@@ -293,7 +207,7 @@ const ConfigurationForm = () => {
         <Button
           variant="outline"
           onClick={handleTestConfiguration}
-          disabled={!isConfigurationComplete || isTesting || isSaving}
+          disabled={!isConfigurationComplete || isTesting}
           className="gap-2"
         >
           {isTesting ? (
@@ -302,18 +216,6 @@ const ConfigurationForm = () => {
             <Play className="h-4 w-4" />
           )}
           {isTesting ? "Testing..." : "Test Configuration"}
-        </Button>
-        <Button
-          onClick={handleSaveConfiguration}
-          disabled={!isConfigurationComplete || isSaving || isTesting}
-          className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700"
-        >
-          {isSaving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
-          {isSaving ? "Saving..." : "Save Configuration"}
         </Button>
       </div>
     </div>

@@ -15,15 +15,20 @@ import Config from '@/pages/Config';
 import Discovery from '@/pages/Discovery';
 import NotFound from '@/pages/NotFound';
 
+// Feature flags
+export const FEATURE_FLAGS = {
+  showDiscovery: false, // Set to false to hide Discovery menu and route
+};
+
 function App() {
   return (
     <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
       <Toaster />
       <Routes>
-        {/* 登录页面 - 不需要认证保护 */}
+        {/* Login page - no authentication protection required */}
         <Route path="/login" element={<Login />} />
         
-        {/* 受保护的路由 - 需要登录才能访问 */}
+        {/* Protected routes - login required to access */}
         <Route path="/" element={
           <AuthGuard>
             <Layout />
@@ -35,7 +40,9 @@ function App() {
           <Route path="tables" element={<Tables />} />
           <Route path="monitor" element={<Monitor />} />
           <Route path="config" element={<Config />} />
-          <Route path="discovery" element={<Discovery />} />
+          {FEATURE_FLAGS.showDiscovery && (
+            <Route path="discovery" element={<Discovery />} />
+          )}
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>

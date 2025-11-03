@@ -254,7 +254,7 @@ export class ModuleService {
      }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/modules`, {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/module/config`, {
         method: 'POST',
         headers: getDefaultHeaders(),
         body: JSON.stringify(moduleData),
@@ -295,8 +295,8 @@ export class ModuleService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/modules/${moduleId}`, {
-        method: 'PUT',
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/module/config`, {
+        method: 'POST',
         headers: getDefaultHeaders(),
         body: JSON.stringify(updateData),
       });

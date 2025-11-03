@@ -65,7 +65,7 @@ class FlowDataService {
       console.log('[FlowDataService] Making parallel API calls...');
       const [modulesData, modelsData, tablesData] = await Promise.all([
         moduleService.getAllModules(),
-        modelService.findAllModels(), // 使用findAllModels获取所有模型数据
+        modelService.getAllModels(), // 使用getAllModels获取所有模型数据
         tableService.getAllTables(),
       ]);
 
