@@ -194,161 +194,113 @@ const calculateHorizontalLayout = (
     isExpanded: expandedModules.has(module.data.moduleId)
   }));
   
-  // Calculate module node positions (horizontal arrangement)
-  let currentX = HORIZONTAL_LAYOUT.startPosition.x;
-  
-  moduleModelCounts.forEach((moduleInfo, moduleIndex) => {
-    const { module: moduleNode, modelCount, isExpanded } = moduleInfo;
-    const moduleY = HORIZONTAL_LAYOUT.startPosition.y;
-    
-    // Dynamically adjust module spacing, considering expanded model count
-    if (moduleIndex > 0) {
-      const prevModuleInfo = moduleModelCounts[moduleIndex - 1];
-      const prevExpandedHeight = prevModuleInfo.isExpanded ? 
-        prevModuleInfo.modelCount * HORIZONTAL_LAYOUT.modelVerticalSpacing : 0;
-      const currentExpandedHeight = isExpanded ? 
-        modelCount * HORIZONTAL_LAYOUT.modelVerticalSpacing : 0;
-      
-      // Adjust spacing based on expansion state
-      const dynamicSpacing = Math.max(
-        HORIZONTAL_LAYOUT.moduleSpacing,
-        HORIZONTAL_LAYOUT.moduleToModelOffset + HORIZONTAL_LAYOUT.minNodeDistance
-      );
-      
-      currentX += dynamicSpacing;
-    }
-    
-    // Add module node
-    const isHighlighted = highlightedModules.has(moduleNode.id) || highlightedModules.has(moduleNode.data.moduleId);
-    const positionedModule: Node<ModuleNodeData> = {
-      ...moduleNode,
-      position: { x: currentX, y: moduleY },
-      data: {
-        ...moduleNode.data,
-        isExpanded: expandedModules.has(moduleNode.data.moduleId),
-        isAnimating: animatingNodes.has(moduleNode.id),
-        childCount: getModelsByModule(moduleNode.data.moduleId).length,
-      },
-      style: {
-        ...moduleNode.style,
-        transition: `all ${HORIZONTAL_LAYOUT.animationDuration}ms ease-in-out`,
-        zIndex: 10, // Ensure module nodes are on top layer
-        boxShadow: isHighlighted ? '0 0 0 3px #f59e0b' : moduleNode.style?.boxShadow,
-      },
-    };
-    
-    layoutNodes.push(positionedModule);
-    
-    // If module is expanded, add its model nodes
-    if (expandedModules.has(moduleNode.data.moduleId)) {
-      const models = getModelsByModule(moduleNode.data.moduleId);
-      
-      // Calculate vertical distribution of model nodes, ensuring center alignment
-      const totalHeight = (models.length - 1) * HORIZONTAL_LAYOUT.modelVerticalSpacing;
-      const startY = moduleY - totalHeight / 2;
-      
-      models.forEach((modelNode, modelIndex) => {
-        const modelX = currentX + HORIZONTAL_LAYOUT.moduleToModelOffset;
-        const modelY = startY + modelIndex * HORIZONTAL_LAYOUT.modelVerticalSpacing;
-        
-        const positionedModel: Node<ModelNodeData> = {
-          ...modelNode,
-          position: { x: modelX, y: modelY },
-          data: {
-            ...modelNode.data,
-            level: 1,
-            isAnimating: animatingNodes.has(modelNode.id),
-          },
-          style: {
-            ...modelNode.style,
-            transition: `all ${HORIZONTAL_LAYOUT.animationDuration}ms ease-in-out`,
-            opacity: 1,
-            zIndex: 5, // Model nodes on middle layer
-          },
-        };
-        
-        layoutNodes.push(positionedModel);
-        
-        // Add connection edge from module to model (real data)
-        layoutEdges.push({
-          id: `edge-${moduleNode.id}-${modelNode.id}`,
-          source: moduleNode.id,
-          target: modelNode.id,
-          sourceHandle: 'module-output',
-          targetHandle: 'model-input',
-          type: 'smoothstep',
-          animated: false,
-          style: { stroke: '#94a3b8', strokeWidth: 2 },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
-          data: { type: 'module-model', level: 1 },
-        });
-      });
-    }
+  // Group modules by priority and stack vertically within each group
+  const groupsMap = new Map<number, ModuleLayoutInfo[]>();
+  moduleModelCounts.forEach(info => {
+    const p = info.module.data.priority;
+    const arr = groupsMap.get(p) || [];
+    arr.push(info);
+    groupsMap.set(p, arr);
   });
 
-  // Build a complete dependency graph between modules
-  const moduleDependencies = new Map<string, Set<string>>();
-  const moduleDependents = new Map<string, Set<string>>();
+  const priorities = Array.from(groupsMap.keys()).sort((a, b) => a - b);
+  const columnSpacing = Math.max(
+    HORIZONTAL_LAYOUT.moduleSpacing,
+    HORIZONTAL_LAYOUT.moduleToModelOffset + HORIZONTAL_LAYOUT.minNodeDistance
+  );
 
-  sortedModules.forEach(sourceModule => {
-    const sourceModels = getModelsByModule(sourceModule.data.moduleId);
-    sourceModels.forEach(sourceModel => {
-      if (sourceModel.data.dependOn) {
-        sortedModules.forEach(targetModule => {
-          if (targetModule.data.moduleId !== sourceModule.data.moduleId) {
-            const targetModels = getModelsByModule(targetModule.data.moduleId);
-            const isDependency = targetModels.some(model => 
-              model.data.modelId === sourceModel.data.dependOn ||
-              model.data.label === sourceModel.data.dependOn
-            );
+  priorities.forEach((priorityValue, colIndex) => {
+    const groupInfos = groupsMap.get(priorityValue)!;
+    const columnX = HORIZONTAL_LAYOUT.startPosition.x + colIndex * columnSpacing;
+    const totalHeight = (groupInfos.length - 1) * HORIZONTAL_LAYOUT.modelVerticalSpacing;
+    const startY = HORIZONTAL_LAYOUT.startPosition.y - totalHeight / 2;
 
-            if (isDependency) {
-              // Source module depends on target module
-              if (!moduleDependencies.has(sourceModule.id)) {
-                moduleDependencies.set(sourceModule.id, new Set());
-              }
-              moduleDependencies.get(sourceModule.id)!.add(targetModule.id);
+    groupInfos.forEach((moduleInfo, moduleIndex) => {
+      const { module: moduleNode } = moduleInfo;
+      const moduleY = startY + moduleIndex * HORIZONTAL_LAYOUT.modelVerticalSpacing;
 
-              // Target module is a dependent of source module
-              if (!moduleDependents.has(targetModule.id)) {
-                moduleDependents.set(targetModule.id, new Set());
-              }
-              moduleDependents.get(targetModule.id)!.add(sourceModule.id);
-            }
-          }
+      // Add module node (highlight-aware)
+      const isHighlighted = highlightedModules.has(moduleNode.id) || highlightedModules.has(moduleNode.data.moduleId);
+      const positionedModule: Node<ModuleNodeData> = {
+        ...moduleNode,
+        position: { x: columnX, y: moduleY },
+        data: {
+          ...moduleNode.data,
+          isExpanded: expandedModules.has(moduleNode.data.moduleId),
+          isAnimating: animatingNodes.has(moduleNode.id),
+          childCount: getModelsByModule(moduleNode.data.moduleId).length,
+        },
+        style: {
+          ...moduleNode.style,
+          transition: `all ${HORIZONTAL_LAYOUT.animationDuration}ms ease-in-out`,
+          zIndex: 10,
+          boxShadow: isHighlighted ? '0 0 0 3px #f59e0b' : moduleNode.style?.boxShadow,
+        },
+      };
+      layoutNodes.push(positionedModule);
+
+      // If module is expanded, add its model nodes beneath/right of the module
+      if (expandedModules.has(moduleNode.data.moduleId)) {
+        const models = getModelsByModule(moduleNode.data.moduleId);
+        const modelsTotalHeight = (models.length - 1) * HORIZONTAL_LAYOUT.modelVerticalSpacing;
+        const modelsStartY = moduleY - modelsTotalHeight / 2;
+
+        models.forEach((modelNode, modelIdx) => {
+          const modelX = columnX + HORIZONTAL_LAYOUT.moduleToModelOffset;
+          const modelY = modelsStartY + modelIdx * HORIZONTAL_LAYOUT.modelVerticalSpacing;
+
+          const positionedModel: Node<ModelNodeData> = {
+            ...modelNode,
+            position: { x: modelX, y: modelY },
+            data: {
+              ...modelNode.data,
+              level: 1,
+              isAnimating: animatingNodes.has(modelNode.id),
+            },
+            style: {
+              ...modelNode.style,
+              transition: `all ${HORIZONTAL_LAYOUT.animationDuration}ms ease-in-out`,
+              opacity: 1,
+              zIndex: 5,
+            },
+          };
+
+          layoutNodes.push(positionedModel);
+
+          // Add connection edge from module to model
+          layoutEdges.push({
+            id: `edge-${moduleNode.id}-${modelNode.id}`,
+            source: moduleNode.id,
+            target: modelNode.id,
+            sourceHandle: 'module-output',
+            targetHandle: 'model-input',
+            type: 'smoothstep',
+            animated: false,
+            style: { stroke: '#94a3b8', strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: '#94a3b8' },
+            data: { type: 'module-model', level: 1 },
+          });
         });
       }
     });
   });
 
-  // Create edges with vertical offset based on priority
-  const moduleOutputCounts = new Map<string, number>();
-  const moduleInputCounts = new Map<string, number>();
+  // Create priority-based edges: connect modules from each priority group to the next
+  for (let gi = 0; gi < priorities.length - 1; gi++) {
+    const currentGroup = groupsMap.get(priorities[gi])!;
+    const nextGroup = groupsMap.get(priorities[gi + 1])!;
 
-  moduleDependencies.forEach((targets, sourceId) => {
-    const sourceModule = sortedModules.find(m => m.id === sourceId)!;
-    // Targets sorted by priority; tie-breaker uses DOM order (layout order)
-    const sortedTargets = Array.from(targets).sort((a, b) => {
-      const moduleA = sortedModules.find(m => m.id === a)!;
-      const moduleB = sortedModules.find(m => m.id === b)!;
-      const priDiff = moduleA.data.priority - moduleB.data.priority;
-      if (priDiff !== 0) return priDiff;
-      return (moduleIndexMap.get(moduleA.id) || 0) - (moduleIndexMap.get(moduleB.id) || 0);
-    });
+    currentGroup.forEach((srcInfo, idx) => {
+      const srcModule = srcInfo.module;
+      const targetIdx = Math.min(idx, nextGroup.length - 1);
+      const tgtInfo = nextGroup[targetIdx];
+      const tgtModule = tgtInfo.module;
 
-    sortedTargets.forEach(targetId => {
-      const targetModule = sortedModules.find(m => m.id === targetId)!;
-      const sourceOutputIndex = moduleOutputCounts.get(sourceId) || 0;
-      const targetInputIndex = moduleInputCounts.get(targetId) || 0;
+      // Vertical offset tie-breaker: center-based spread within group
+      const srcYOffset = (idx - (currentGroup.length - 1) / 2) * 20;
+      const tgtYOffset = (targetIdx - (nextGroup.length - 1) / 2) * 20;
 
-      const sourceTotalOutputs = moduleDependents.get(sourceId)?.size || 1;
-      const targetTotalInputs = moduleDependencies.get(targetId)?.size || 1;
-
-      const sourceYOffset = (sourceOutputIndex - (sourceTotalOutputs - 1) / 2) * 20;
-      const targetYOffset = (targetInputIndex - (targetTotalInputs - 1) / 2) * 20;
-
-      // High-priority edges are more prominent (thicker stroke + animation)
-      const isHighPriority = sourceModule.data.priority <= 1 || targetModule.data.priority <= 1;
+      const isHighPriority = srcModule.data.priority <= 1 || tgtModule.data.priority <= 1;
       const edgeStyle: React.CSSProperties = isHighPriority
         ? { stroke: '#1d4ed8', strokeWidth: 3 }
         : { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6,4' };
@@ -356,21 +308,21 @@ const calculateHorizontalLayout = (
       const edgeData: ModuleEdgeData = {
         type: 'module-dependency',
         level: 0,
-        sourceY: sourceYOffset,
-        targetY: targetYOffset,
-        sourceId: sourceId,
-        targetId: targetId,
-        sourceLabel: sourceModule.data.label,
-        targetLabel: targetModule.data.label,
-        sourcePriority: sourceModule.data.priority,
-        targetPriority: targetModule.data.priority,
+        sourceY: srcYOffset,
+        targetY: tgtYOffset,
+        sourceId: srcModule.id,
+        targetId: tgtModule.id,
+        sourceLabel: srcModule.data.label,
+        targetLabel: tgtModule.data.label,
+        sourcePriority: srcModule.data.priority,
+        targetPriority: tgtModule.data.priority,
         onEdgeClick,
       };
 
       layoutEdges.push({
-        id: `module-edge-${sourceId}-${targetId}`,
-        source: sourceId,
-        target: targetId,
+        id: `module-edge-${srcModule.id}-${tgtModule.id}`,
+        source: srcModule.id,
+        target: tgtModule.id,
         sourceHandle: 'module-output',
         targetHandle: 'module-input',
         type: 'custom-module-edge',
@@ -379,11 +331,8 @@ const calculateHorizontalLayout = (
         markerEnd: { type: MarkerType.ArrowClosed, color: edgeStyle.stroke as string },
         data: edgeData,
       });
-
-      moduleOutputCounts.set(sourceId, sourceOutputIndex + 1);
-      moduleInputCounts.set(targetId, targetInputIndex + 1);
     });
-  });
+  }
 
   return { nodes: layoutNodes, edges: layoutEdges };
 };

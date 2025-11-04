@@ -37,6 +37,8 @@ interface FlowDataCache {
   moduleToModels: Map<string, Node<ModelNodeData>[]>;
   moduleRelations: Map<string, Edge[]>;
   modelRelations: Map<string, Edge[]>;
+  // 基于优先级的模块边
+  priorityEdges: Edge[];
 }
 
 export const useFlowData = (autoFetch = true): UseFlowDataState => {
@@ -59,29 +61,49 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     let nodeId = 0;
     const getNextId = () => `node-${++nodeId}`;
     
-    // 按优先级排序模块
+    // 按优先级分组并纵向堆叠模块节点
     const sortedModules = [...rawData.modules].sort((a, b) => (a.priority || 0) - (b.priority || 0));
-    
-    // 创建模块节点
-    const moduleNodes: Node<ModuleNodeData>[] = sortedModules.map((module, index) => {
-      const id = getNextId();
-      return {
-        id,
-        type: 'moduleNode',
-        position: {
-          x: LAYOUT_CONFIG.startPosition.x + (index % 3) * LAYOUT_CONFIG.nodeSpacing.x * 1.5,
-          y: LAYOUT_CONFIG.startPosition.y,
-        },
-        data: {
-          label: module.moduleName || module.name || `Module ${module.moduleId}`,
-          type: 'module',
-          priority: module.priority || 0,
-          moduleId: module.moduleId,
-          version: module.version,
-          level: 0,
-          isExpanded: false,
-        } as ModuleNodeData,
-      };
+    const modulesByPriority = new Map<number, typeof sortedModules>();
+    sortedModules.forEach((m) => {
+      const p = m.priority || 0;
+      const arr = modulesByPriority.get(p) || [];
+      arr.push(m);
+      modulesByPriority.set(p, arr);
+    });
+    const priorities = Array.from(modulesByPriority.keys()).sort((a, b) => a - b);
+
+    const moduleNodes: Node<ModuleNodeData>[] = [];
+    const moduleNodesByPriority = new Map<number, Node<ModuleNodeData>[]>();
+
+    priorities.forEach((p, colIndex) => {
+      const group = modulesByPriority.get(p)!;
+      const columnX = LAYOUT_CONFIG.startPosition.x + colIndex * LAYOUT_CONFIG.nodeSpacing.x * 1.5;
+      const totalHeight = (group.length - 1) * LAYOUT_CONFIG.nodeSpacing.y;
+      const startY = LAYOUT_CONFIG.startPosition.y - totalHeight / 2;
+
+      const createdNodes: Node<ModuleNodeData>[] = group.map((module, idx) => {
+        const id = getNextId();
+        return {
+          id,
+          type: 'moduleNode',
+          position: {
+            x: columnX,
+            y: startY + idx * LAYOUT_CONFIG.nodeSpacing.y,
+          },
+          data: {
+            label: module.moduleName || module.name || `Module ${module.moduleId}`,
+            type: 'module',
+            priority: module.priority || 0,
+            moduleId: module.moduleId,
+            version: module.version,
+            level: 0,
+            isExpanded: false,
+          } as ModuleNodeData,
+        };
+      });
+
+      moduleNodes.push(...createdNodes);
+      moduleNodesByPriority.set(p, createdNodes);
     });
     
     allNodes.push(...moduleNodes);
@@ -191,6 +213,46 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       }
     });
 
+    // 基于优先级创建模块之间的连接边（从每个优先级组连接到下一个组）
+    const priorityEdges: Edge[] = [];
+    for (let gi = 0; gi < priorities.length - 1; gi++) {
+      const currentGroup = moduleNodesByPriority.get(priorities[gi])!;
+      const nextGroup = moduleNodesByPriority.get(priorities[gi + 1])!;
+
+      currentGroup.forEach((srcNode, idx) => {
+        const targetIdx = Math.min(idx, nextGroup.length - 1);
+        const tgtNode = nextGroup[targetIdx];
+
+        const isHighPriority = (srcNode.data.priority <= 1) || (tgtNode.data.priority <= 1);
+        const strokeColor = isHighPriority ? '#1d4ed8' : '#3b82f6';
+
+        priorityEdges.push({
+          id: `module-edge-${srcNode.data.moduleId}-${tgtNode.data.moduleId}`,
+          source: srcNode.id,
+          target: tgtNode.id,
+          sourceHandle: 'module-output',
+          targetHandle: 'module-input',
+          type: 'smoothstep',
+          animated: isHighPriority,
+          style: isHighPriority
+            ? { stroke: strokeColor, strokeWidth: 3 }
+            : { stroke: strokeColor, strokeWidth: 2, strokeDasharray: '6,4' },
+          markerEnd: {
+            type: MarkerType.ArrowClosed,
+            color: strokeColor,
+          },
+          label: 'priority',
+          labelStyle: { fontSize: 12, fill: strokeColor, fontWeight: isHighPriority ? 'bold' : 'normal' },
+          data: {
+            type: 'module-dependency',
+            level: 0,
+            sourceType: 'module',
+            targetType: 'module',
+          },
+        });
+      });
+    }
+
     console.log('[useFlowData] Created edges:', {
       total: allEdges.length,
       byType: {
@@ -223,6 +285,9 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       }))
     });
 
+    // 将优先级模块边加入总边集合（用于关系缓存和默认视图）
+    allEdges.push(...priorityEdges);
+
     // 构建关系映射缓存
     const moduleToModels = new Map<string, Node<ModelNodeData>[]>();
     const moduleRelations = new Map<string, Edge[]>();
@@ -237,6 +302,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       
       // 缓存模块相关的边
       const relatedEdges = allEdges.filter(edge => 
+        edge.source === moduleNode.id ||
         edge.target === moduleNode.id || 
         relatedModels.some(model => model.id === edge.source || model.id === edge.target)
       );
@@ -259,81 +325,27 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       moduleToModels,
       moduleRelations,
       modelRelations,
+      priorityEdges,
     };
   }, [rawData]);
 
-  // 导出的节点和边（默认显示模块和模块间的依赖关系）
+  // 导出的节点和边（默认显示模块和基于优先级的模块连接）
   const { nodes, edges } = useMemo(() => {
     if (!dataCache) {
       return { nodes: [], edges: [] };
     }
     
-    // 创建模块间的依赖关系边（基于模型依赖关系推导）
-    const moduleEdges: Edge[] = [];
-    const processedModulePairs = new Set<string>();
-
-    // 遍历所有模型依赖关系，推导出模块间的依赖
-    dataCache.allEdges.forEach(edge => {
-      if (edge.data?.type === 'dependency') {
-        const sourceNode = dataCache.allNodes.find(node => node.id === edge.source);
-        const targetNode = dataCache.allNodes.find(node => node.id === edge.target);
-        
-        if (sourceNode?.data?.type === 'model' && targetNode?.data?.type === 'model') {
-          const sourceModuleId = (sourceNode.data as ModelNodeData).parentModuleId || (sourceNode.data as ModelNodeData).moduleId;
-          const targetModuleId = (targetNode.data as ModelNodeData).parentModuleId || (targetNode.data as ModelNodeData).moduleId;
-          
-          // 只有当模型属于不同模块时才创建模块间的边
-          if (sourceModuleId && targetModuleId && sourceModuleId !== targetModuleId) {
-            const pairKey = `${sourceModuleId}-${targetModuleId}`;
-            
-            if (!processedModulePairs.has(pairKey)) {
-              processedModulePairs.add(pairKey);
-              
-              // 找到对应的模块节点
-              const sourceModule = dataCache.moduleNodes.find(m => m.data.moduleId === sourceModuleId);
-              const targetModule = dataCache.moduleNodes.find(m => m.data.moduleId === targetModuleId);
-              
-              if (sourceModule && targetModule) {
-                moduleEdges.push({
-                  id: `module-edge-${sourceModuleId}-${targetModuleId}`,
-                  source: sourceModule.id,
-                  target: targetModule.id,
-                  sourceHandle: 'module-output',
-                  targetHandle: 'module-input',
-                  type: 'smoothstep',
-                  animated: true,
-                  style: { stroke: '#3b82f6', strokeWidth: 3 },
-                  markerEnd: {
-                    type: MarkerType.ArrowClosed,
-                    color: '#3b82f6',
-                  },
-                  label: 'depends on',
-                  labelStyle: { fontSize: 12, fill: '#3b82f6', fontWeight: 'bold' },
-                  data: { 
-                    type: 'module-dependency',
-                    level: 0,
-                    sourceType: 'module',
-                    targetType: 'module'
-                  }
-                });
-              }
-            }
-          }
-        }
-      }
-    });
-    
     console.log('[useFlowData] Default return values:', {
       nodeCount: dataCache.moduleNodes.length,
-      edgeCount: moduleEdges.length,
+      edgeCount: dataCache.priorityEdges.length,
       allEdgesInCache: dataCache.allEdges.length,
-      moduleEdgeDetails: moduleEdges.map(e => ({ id: e.id, source: e.source, target: e.target })),
+      moduleEdgeDetails: dataCache.priorityEdges.map(e => ({ id: e.id, source: e.source, target: e.target })),
       allEdgeDetails: dataCache.allEdges.map(e => ({ id: e.id, source: e.source, target: e.target, type: e.data?.type }))
     });
     
     return {
       nodes: dataCache.moduleNodes,
-      edges: moduleEdges,
+      edges: dataCache.priorityEdges,
     };
   }, [dataCache]);
 
