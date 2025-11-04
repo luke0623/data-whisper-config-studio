@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Module, CreateModuleRequest, UpdateModuleRequest } from '../models/module';
 import { moduleService } from '../services/moduleService';
 import { toast } from '@/hooks/use-toast';
@@ -254,7 +254,10 @@ const Modules: React.FC = () => {
             </DialogTrigger>
             <DialogContent className="max-w-none max-h-none w-screen h-screen p-0 m-0 border-0">
               <DialogHeader className="p-6 pb-2">
-                <DialogTitle>Flow Diagram </DialogTitle>
+                <DialogTitle>Flow Diagram</DialogTitle>
+                <DialogDescription>
+                  Explore the execution flow. Hover edges for details and click nodes to inspect.
+                </DialogDescription>
               </DialogHeader>
               <div className="flex-1 h-[calc(100vh-80px)] p-6 pt-2">
                 <ExecutionFlowDiagram 
@@ -394,6 +397,9 @@ const Modules: React.FC = () => {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Create New Module</DialogTitle>
+            <DialogDescription>
+              Provide module details. The Module ID is auto-generated and cannot be edited.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
@@ -457,6 +463,9 @@ const Modules: React.FC = () => {
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Edit Module</DialogTitle>
+            <DialogDescription>
+              Update module details. The Module ID is fixed and cannot be changed.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">

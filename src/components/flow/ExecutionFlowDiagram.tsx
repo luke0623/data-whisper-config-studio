@@ -50,6 +50,8 @@ interface DiagramState {
   expandedModules: Set<string>;
   /** Set of node IDs currently executing animations */
   animatingNodes: Set<string>;
+  /** Set of module IDs highlighted by edge interactions */
+  highlightedModules: Set<string>;
 }
 
 /**
@@ -99,6 +101,24 @@ interface LayoutResult {
 }
 
 /**
+ * Module edge data interface for custom module-to-module edges.
+ * Carries vertical offsets and rich metadata for hover/click interactions.
+ */
+interface ModuleEdgeData {
+  type: 'module-dependency';
+  level: number;
+  sourceY: number;
+  targetY: number;
+  sourceId: string;
+  targetId: string;
+  sourceLabel?: string;
+  targetLabel?: string;
+  sourcePriority?: number;
+  targetPriority?: number;
+  onEdgeClick?: (sourceId: string, targetId: string) => void;
+}
+
+/**
  * Flow statistics interface
  */
 interface FlowStatistics {
@@ -144,17 +164,28 @@ const HORIZONTAL_LAYOUT: HorizontalLayoutConfig = {
  * @param getModelsByModule - Function to get model nodes by module ID
  * @returns Layout result containing calculated nodes and edges
  */
+/**
+ * Calculate horizontal layout for modules and models, and build edges.
+ * Sorting strategy:
+ * - Modules: ascending `priority`.
+ * - Module-to-module edges: targets sorted by ascending `priority`; ties by DOM order (layout order).
+ * - High-priority connections are rendered first and given more prominent styles.
+ */
 const calculateHorizontalLayout = (
   moduleNodes: Node<ModuleNodeData>[],
   expandedModules: Set<string>,
   animatingNodes: Set<string>,
-  getModelsByModule: (moduleId: string) => Node<ModelNodeData>[]
+  getModelsByModule: (moduleId: string) => Node<ModelNodeData>[],
+  highlightedModules: Set<string>,
+  onEdgeClick?: (sourceId: string, targetId: string) => void
 ): LayoutResult => {
   const layoutNodes: Node[] = [];
   const layoutEdges: Edge[] = [];
   
   // Sort module nodes by priority
   const sortedModules = [...moduleNodes].sort((a, b) => a.data.priority - b.data.priority);
+  const moduleIndexMap = new Map<string, number>();
+  sortedModules.forEach((m, idx) => moduleIndexMap.set(m.id, idx));
   
   // Calculate model count for each module, used for dynamic spacing adjustment
   const moduleModelCounts: ModuleLayoutInfo[] = sortedModules.map(module => ({
@@ -188,6 +219,7 @@ const calculateHorizontalLayout = (
     }
     
     // Add module node
+    const isHighlighted = highlightedModules.has(moduleNode.id) || highlightedModules.has(moduleNode.data.moduleId);
     const positionedModule: Node<ModuleNodeData> = {
       ...moduleNode,
       position: { x: currentX, y: moduleY },
@@ -201,6 +233,7 @@ const calculateHorizontalLayout = (
         ...moduleNode.style,
         transition: `all ${HORIZONTAL_LAYOUT.animationDuration}ms ease-in-out`,
         zIndex: 10, // Ensure module nodes are on top layer
+        boxShadow: isHighlighted ? '0 0 0 3px #f59e0b' : moduleNode.style?.boxShadow,
       },
     };
     
@@ -294,10 +327,13 @@ const calculateHorizontalLayout = (
 
   moduleDependencies.forEach((targets, sourceId) => {
     const sourceModule = sortedModules.find(m => m.id === sourceId)!;
+    // Targets sorted by priority; tie-breaker uses DOM order (layout order)
     const sortedTargets = Array.from(targets).sort((a, b) => {
       const moduleA = sortedModules.find(m => m.id === a)!;
       const moduleB = sortedModules.find(m => m.id === b)!;
-      return moduleA.data.priority - moduleB.data.priority;
+      const priDiff = moduleA.data.priority - moduleB.data.priority;
+      if (priDiff !== 0) return priDiff;
+      return (moduleIndexMap.get(moduleA.id) || 0) - (moduleIndexMap.get(moduleB.id) || 0);
     });
 
     sortedTargets.forEach(targetId => {
@@ -311,6 +347,26 @@ const calculateHorizontalLayout = (
       const sourceYOffset = (sourceOutputIndex - (sourceTotalOutputs - 1) / 2) * 20;
       const targetYOffset = (targetInputIndex - (targetTotalInputs - 1) / 2) * 20;
 
+      // High-priority edges are more prominent (thicker stroke + animation)
+      const isHighPriority = sourceModule.data.priority <= 1 || targetModule.data.priority <= 1;
+      const edgeStyle: React.CSSProperties = isHighPriority
+        ? { stroke: '#1d4ed8', strokeWidth: 3 }
+        : { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6,4' };
+
+      const edgeData: ModuleEdgeData = {
+        type: 'module-dependency',
+        level: 0,
+        sourceY: sourceYOffset,
+        targetY: targetYOffset,
+        sourceId: sourceId,
+        targetId: targetId,
+        sourceLabel: sourceModule.data.label,
+        targetLabel: targetModule.data.label,
+        sourcePriority: sourceModule.data.priority,
+        targetPriority: targetModule.data.priority,
+        onEdgeClick,
+      };
+
       layoutEdges.push({
         id: `module-edge-${sourceId}-${targetId}`,
         source: sourceId,
@@ -318,15 +374,10 @@ const calculateHorizontalLayout = (
         sourceHandle: 'module-output',
         targetHandle: 'module-input',
         type: 'custom-module-edge',
-        animated: false,
-        style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6,4' },
-        markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-        data: {
-          type: 'module-dependency',
-          level: 0,
-          sourceY: sourceYOffset,
-          targetY: targetYOffset,
-        },
+        animated: isHighPriority,
+        style: edgeStyle,
+        markerEnd: { type: MarkerType.ArrowClosed, color: edgeStyle.stroke as string },
+        data: edgeData,
       });
 
       moduleOutputCounts.set(sourceId, sourceOutputIndex + 1);
@@ -361,15 +412,31 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
   const [state, setState] = useState<DiagramState>({
     expandedModules: new Set(),
     animatingNodes: new Set(),
+    highlightedModules: new Set(),
   });
 
   // ReactFlow state management
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const edgeTypes = {
+  const edgeTypes = useMemo(() => ({
     'custom-module-edge': CustomModuleEdge,
-  };
+  }), []);
+
+  // Edge click interaction: highlight connected modules and auto-clear
+  const handleEdgeClick = useCallback((sourceId: string, targetId: string) => {
+    setState(prev => {
+      const next = { ...prev };
+      const setHL = new Set<string>(next.highlightedModules);
+      setHL.add(sourceId);
+      setHL.add(targetId);
+      next.highlightedModules = setHL;
+      return next;
+    });
+    window.setTimeout(() => {
+      setState(prev => ({ ...prev, highlightedModules: new Set() }));
+    }, 1200);
+  }, []);
 
   // Calculate visible nodes and edges based on expansion state
   const visibleContent = useMemo(() => {
@@ -383,7 +450,9 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
       moduleNodes,
       state.expandedModules,
       state.animatingNodes,
-      getModelsByModule
+      getModelsByModule,
+      state.highlightedModules,
+      handleEdgeClick
     );
 
     console.log('=== LAYOUT RESULT ===');
@@ -412,7 +481,7 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
     });
 
     return result;
-  }, [getModuleNodes, getModelsByModule, state.expandedModules, state.animatingNodes]);
+  }, [getModuleNodes, getModelsByModule, state.expandedModules, state.animatingNodes, state.highlightedModules]);
 
   // Update ReactFlow nodes and edges
   useEffect(() => {
@@ -422,12 +491,12 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
     
     // if (visibleContent.edges.length > 0) {
     console.log('Sample edges being set:', visibleContent.edges.slice(0, 3));
-    
-    
-    setNodes(visibleContent.nodes);
-    setEdges(visibleContent.edges);
-    
-    console.log('ReactFlow state updated successfully');
+    const timer = window.setTimeout(() => {
+      setNodes(visibleContent.nodes);
+      setEdges(visibleContent.edges);
+      console.log('ReactFlow state updated successfully');
+    }, 120);
+    return () => window.clearTimeout(timer);
   }, [visibleContent, setNodes, setEdges]);
 
   // Handle connections
@@ -470,6 +539,7 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
           return {
             expandedModules: newExpandedModules,
             animatingNodes: newAnimatingNodes,
+            highlightedModules: prev.highlightedModules,
           };
         });
       }, 50);
@@ -506,6 +576,7 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
     setState({
       expandedModules: new Set(),
       animatingNodes: new Set(),
+      highlightedModules: new Set(),
     });
     toast({
       title: "Cache Cleared",
@@ -518,6 +589,7 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
     setState({
       expandedModules: new Set(),
       animatingNodes: new Set(),
+      highlightedModules: new Set(),
     });
     toast({
       title: "View Reset",
@@ -630,7 +702,7 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
         nodesDraggable={true}
         nodesConnectable={false}
         elementsSelectable={true}
-        onlyRenderVisibleElements={false} // Changed to false for testing
+        onlyRenderVisibleElements={true}
         zoomOnScroll={true}
         zoomOnPinch={true}
         panOnScroll={false}
