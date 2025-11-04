@@ -1,13 +1,13 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Activity, CheckCircle, XCircle, Clock, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
-import { monitorService } from '@/services';
-import { IngestionEvent, MonitoringSummary } from '@/models';
+import { monitorService, moduleService } from '@/services';
+import { IngestionEvent, MonitoringSummary, Module } from '@/models';
 import { toast } from '@/hooks/use-toast';
 
 const Monitor = () => {
@@ -16,10 +16,28 @@ const Monitor = () => {
   const [loading, setLoading] = useState(true);
   const [ingestionEvents, setIngestionEvents] = useState<IngestionEvent[]>([]);
   const [summary, setSummary] = useState<MonitoringSummary | null>(null);
+  const [availableModules, setAvailableModules] = useState<Module[]>([]);
 
   // Fetch ingestion events on component mount
   useEffect(() => {
     fetchIngestionEvents();
+  }, []);
+
+  // Fetch available modules on component mount (real data)
+  useEffect(() => {
+    const loadModules = async () => {
+      try {
+        const mods = await moduleService.getAllModules();
+        setAvailableModules(mods);
+      } catch (error: any) {
+        toast({
+          title: 'Error Fetching Modules',
+          description: error?.message || 'Failed to fetch modules',
+          variant: 'destructive',
+        });
+      }
+    };
+    loadModules();
   }, []);
 
   // Fetch ingestion events when selected module changes
@@ -126,11 +144,14 @@ const Monitor = () => {
     }
   };
 
-  const modules = ['Policy Management', 'Claims', 'Finance', 'Customer Management', 'Reinsurance'];
+  // Map moduleId -> moduleName for local filtering alignment
+  const moduleIdToName = useMemo(() => new Map<string, string>(
+    availableModules.map((m) => [m.moduleId, m.moduleName])
+  ), [availableModules]);
 
-  const filteredEvents = selectedModule === 'all' 
-    ? ingestionEvents 
-    : ingestionEvents.filter(event => event.module === selectedModule);
+  const filteredEvents = selectedModule === 'all'
+    ? ingestionEvents
+    : ingestionEvents.filter((event) => event.module === (moduleIdToName.get(selectedModule) || selectedModule));
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -275,9 +296,9 @@ const Monitor = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Modules</SelectItem>
-                {modules.map((module) => (
-                  <SelectItem key={module} value={module}>
-                    {module}
+                {availableModules.map((module) => (
+                  <SelectItem key={module.moduleId} value={module.moduleId}>
+                    {module.moduleName}
                   </SelectItem>
                 ))}
               </SelectContent>

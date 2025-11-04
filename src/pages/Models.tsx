@@ -45,6 +45,9 @@ const Models = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(6); // Number of models displayed per page
+  
+  // Filters
+  const [selectedModuleId, setSelectedModuleId] = useState<string>('');
 
   // Fetch models and modules on component mount
   useEffect(() => {
@@ -69,12 +72,17 @@ const Models = () => {
     fetchData();
   }, []);
 
-  // Pagination calculation logic
-  const totalFilteredCount = models.length;
+  // Apply module dropdown filter (exact match by moduleId)
+  const filteredModels = selectedModuleId
+    ? models.filter((m) => m.moduleId === selectedModuleId)
+    : models;
+
+  // Pagination calculation logic (based on filtered models)
+  const totalFilteredCount = filteredModels.length;
   const calculatedTotalPages = Math.ceil(totalFilteredCount / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const endIndex = startIndex + pageSize;
-  const paginatedModels = models.slice(startIndex, endIndex);
+  const paginatedModels = filteredModels.slice(startIndex, endIndex);
 
   // Update pagination state
   React.useEffect(() => {
@@ -86,6 +94,11 @@ const Models = () => {
       setCurrentPage(1);
     }
   }, [totalFilteredCount, calculatedTotalPages, currentPage, pageSize]);
+
+  // Reset to first page when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedModuleId]);
 
   // Generate UUID with 'f-' prefix for model ID
   const generateModelId = (): string => {
@@ -312,6 +325,35 @@ const Models = () => {
 
       <Separator />
 
+      {/* Filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="filter-module-select">Filter by module</Label>
+          <Select
+            value={selectedModuleId}
+            onValueChange={(value) => setSelectedModuleId(value)}
+          >
+            <SelectTrigger id="filter-module-select">
+              <SelectValue placeholder="All modules" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableModules.map((module) => (
+                <SelectItem key={module.moduleId} value={module.moduleId}>
+                  {module.moduleName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex items-end">
+          {selectedModuleId && (
+            <Button variant="outline" size="sm" onClick={() => setSelectedModuleId('')}>
+              Clear Filter
+            </Button>
+          )}
+        </div>
+      </div>
+
       {/* Error banner */}
       {error && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -377,7 +419,14 @@ const Models = () => {
         </Card>
       )}
 
-      {!loading && models.length > 0 && (
+      {/* No results after filtering */}
+      {!loading && models.length > 0 && filteredModels.length === 0 && (
+        <Card className="p-6">
+          <p className="text-sm text-gray-600">No models match the selected module.</p>
+        </Card>
+      )}
+
+      {!loading && filteredModels.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {paginatedModels.map((model) => (
           <Card key={model.modelId} className="p-6">
