@@ -22,6 +22,7 @@ import { useFlowData } from '../../hooks/useFlowData';
 import { nodeTypes } from './FlowNodes';
 import { useToast } from '../../hooks/use-toast';
 import { ModuleNodeData, ModelNodeData } from './FlowNodes';
+import { CustomModuleEdge } from './CustomModuleEdge';
 
 /**
  * ExecutionFlowDiagram component props interface
@@ -251,51 +252,88 @@ const calculateHorizontalLayout = (
       });
     }
   });
-  
-  // Add dependency edges between modules
-  const processedPairs = new Set<string>();
-  
+
+  // Build a complete dependency graph between modules
+  const moduleDependencies = new Map<string, Set<string>>();
+  const moduleDependents = new Map<string, Set<string>>();
+
   sortedModules.forEach(sourceModule => {
     const sourceModels = getModelsByModule(sourceModule.data.moduleId);
-    
     sourceModels.forEach(sourceModel => {
       if (sourceModel.data.dependOn) {
-        // Find dependent model
         sortedModules.forEach(targetModule => {
           if (targetModule.data.moduleId !== sourceModule.data.moduleId) {
             const targetModels = getModelsByModule(targetModule.data.moduleId);
-            const dependentModel = targetModels.find(model => 
+            const isDependency = targetModels.some(model => 
               model.data.modelId === sourceModel.data.dependOn ||
               model.data.label === sourceModel.data.dependOn
             );
-            
-            if (dependentModel) {
-              const pairKey = `${sourceModule.data.moduleId}-${targetModule.data.moduleId}`;
-              
-              if (!processedPairs.has(pairKey)) {
-                processedPairs.add(pairKey);
-                
-                // Add inter-module dependency edge (derived from real model dependencies)
-                layoutEdges.push({
-                  id: `module-edge-${sourceModule.id}-${targetModule.id}`,
-                  source: targetModule.id,
-                  target: sourceModule.id,
-                  sourceHandle: 'module-output',
-                  targetHandle: 'module-input',
-                  type: 'smoothstep',
-                  animated: false,
-                  style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6,4' },
-                  markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
-                  data: { type: 'module-dependency', level: 0 },
-                });
+
+            if (isDependency) {
+              // Source module depends on target module
+              if (!moduleDependencies.has(sourceModule.id)) {
+                moduleDependencies.set(sourceModule.id, new Set());
               }
+              moduleDependencies.get(sourceModule.id)!.add(targetModule.id);
+
+              // Target module is a dependent of source module
+              if (!moduleDependents.has(targetModule.id)) {
+                moduleDependents.set(targetModule.id, new Set());
+              }
+              moduleDependents.get(targetModule.id)!.add(sourceModule.id);
             }
           }
         });
       }
     });
   });
-  
+
+  // Create edges with vertical offset based on priority
+  const moduleOutputCounts = new Map<string, number>();
+  const moduleInputCounts = new Map<string, number>();
+
+  moduleDependencies.forEach((targets, sourceId) => {
+    const sourceModule = sortedModules.find(m => m.id === sourceId)!;
+    const sortedTargets = Array.from(targets).sort((a, b) => {
+      const moduleA = sortedModules.find(m => m.id === a)!;
+      const moduleB = sortedModules.find(m => m.id === b)!;
+      return moduleA.data.priority - moduleB.data.priority;
+    });
+
+    sortedTargets.forEach(targetId => {
+      const targetModule = sortedModules.find(m => m.id === targetId)!;
+      const sourceOutputIndex = moduleOutputCounts.get(sourceId) || 0;
+      const targetInputIndex = moduleInputCounts.get(targetId) || 0;
+
+      const sourceTotalOutputs = moduleDependents.get(sourceId)?.size || 1;
+      const targetTotalInputs = moduleDependencies.get(targetId)?.size || 1;
+
+      const sourceYOffset = (sourceOutputIndex - (sourceTotalOutputs - 1) / 2) * 20;
+      const targetYOffset = (targetInputIndex - (targetTotalInputs - 1) / 2) * 20;
+
+      layoutEdges.push({
+        id: `module-edge-${sourceId}-${targetId}`,
+        source: sourceId,
+        target: targetId,
+        sourceHandle: 'module-output',
+        targetHandle: 'module-input',
+        type: 'custom-module-edge',
+        animated: false,
+        style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '6,4' },
+        markerEnd: { type: MarkerType.ArrowClosed, color: '#3b82f6' },
+        data: {
+          type: 'module-dependency',
+          level: 0,
+          sourceY: sourceYOffset,
+          targetY: targetYOffset,
+        },
+      });
+
+      moduleOutputCounts.set(sourceId, sourceOutputIndex + 1);
+      moduleInputCounts.set(targetId, targetInputIndex + 1);
+    });
+  });
+
   return { nodes: layoutNodes, edges: layoutEdges };
 };
 
@@ -328,6 +366,10 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
   // ReactFlow state management
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  const edgeTypes = {
+    'custom-module-edge': CustomModuleEdge,
+  };
 
   // Calculate visible nodes and edges based on expansion state
   const visibleContent = useMemo(() => {
@@ -574,6 +616,7 @@ function ExecutionFlowDiagram(props: ExecutionFlowDiagramProps) {
         onConnect={handleConnect}
         onNodeClick={handleNodeClick}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
         fitView
         fitViewOptions={{ 

@@ -269,6 +269,7 @@ const Tables = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(6); // Number of tables displayed per page
+  const [selectedModelName, setSelectedModelName] = useState<string>('all');
   
   // New table related states
   const [createDialogOpen, setCreateDialogOpen] = useState<boolean>(false);
@@ -298,6 +299,14 @@ const Tables = () => {
   const [formErrors, setFormErrors] = useState<{[key: string]: string}>({});
   const [editFormErrors, setEditFormErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Unique model names for filter options
+  const modelNames = React.useMemo(() => {
+    const names = (tables || [])
+      .map(t => t.modelName)
+      .filter((n): n is string => !!n);
+    return Array.from(new Set(names));
+  }, [tables]);
 
   // Function to fetch table data
   const fetchTables = async () => {
@@ -392,8 +401,12 @@ const Tables = () => {
   const filteredTables = (tables || []).filter((table) => {
     const matchesSearch = table.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          (table.label && table.label.toLowerCase().includes(searchTerm.toLowerCase()));
+    // Model name filter
+    const matchesModel = selectedModelName === 'all' || (
+      table.modelName && table.modelName.toLowerCase() === selectedModelName.toLowerCase()
+    );
     // Note: CollectorTableConfig doesn't have status field, so we'll remove status filtering for now
-    return matchesSearch;
+    return matchesSearch && matchesModel;
   });
 
   // Pagination calculation logic
@@ -835,6 +848,17 @@ const Tables = () => {
             onChange={(e) => setSearchTerm(e.target.value)} 
             className="w-full sm:w-80"
           />
+          <Select value={selectedModelName} onValueChange={setSelectedModelName}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Filter by model" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Models</SelectItem>
+              {modelNames.map((name) => (
+                <SelectItem key={name} value={name}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex gap-2">
             <Button 
               variant={selectedStatus === 'all' ? 'default' : 'outline'} 

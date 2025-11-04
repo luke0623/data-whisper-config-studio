@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import Header from '@/components/Header';
 import { 
   Database, 
   Settings, 
@@ -16,19 +16,11 @@ import {
   Plus,
   Eye,
   TrendingUp,
-  Users,
-  Server,
-  User,
-  LogOut
+  Server
 } from 'lucide-react';
 
 const Index = () => {
-  const { user, logout } = useAuth();
-  
-  // Generate user avatar letters
-  const getUserAvatar = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
+  const { user } = useAuth();
   
   // If user is not logged in, show loading state
   if (!user) {
@@ -88,77 +80,12 @@ const Index = () => {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Top-right user information */}
-      <div className="flex justify-end mb-4">
-        <div className="flex items-center gap-3 bg-white rounded-lg shadow-sm border p-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-semibold">
-            {getUserAvatar(user.name)}
-          </div>
-          <div className="text-sm">
-            <p className="font-medium text-gray-900">{user.name}</p>
-            <p className="text-gray-500">{user.email || user.role}</p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={logout}
-            className="text-gray-500 hover:text-red-600"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* User Welcome Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold">
-            {getUserAvatar(user.name)}
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Welcome back, {user.name}!</h1>
-            <p className="text-gray-600">{user.role} • {user.isActive ? 'Active' : 'Inactive'}</p>
-          </div>
-        </div>
-        <div className="text-right">
-          <Badge variant="outline" className="mt-1">
-            <User className="h-3 w-3 mr-1" />
-            {user.isActive ? 'Active' : 'Inactive'}
-          </Badge>
-        </div>
-      </div>
-
-      {/* User Stats Card */}
-      {/* <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-blue-900">Your Activity Summary</h3>
-              <p className="text-sm text-blue-700">You've been productive today, {user.name.split(' ')[0]}!</p>
-            </div>
-            <div className="flex gap-6 text-center">
-              <div>
-                <p className="text-lg font-bold text-blue-700">3</p>
-                <p className="text-xs text-blue-600">Modules Created</p>
-              </div>
-              <div>
-                <p className="text-lg font-bold text-blue-700">12</p>
-                <p className="text-xs text-blue-600">Tasks Completed</p>
-              </div>
-              <div>
-                <p className="text-lg font-bold text-blue-700">98%</p>
-                <p className="text-xs text-blue-600">Success Rate</p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card> */}
-
-      {/* Welcome Message */}
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome to Data MO</h1>
-        <p className="text-lg text-gray-600">Configure your data ingestion and monitor system health</p>
-      </div>
+      {/* Header with user information */}
+      <Header 
+        title="Welcome to Data MO" 
+        description="Configure your data ingestion and monitor system health"
+        showUserInfo={true}
+      />
 
       {/* Quick Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -344,22 +271,7 @@ const Index = () => {
         </CardContent>
       </Card>
 
-      {/* Help Section */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="text-center space-y-3">
-            <Users className="h-8 w-8 text-blue-600 mx-auto" />
-            <h3 className="text-lg font-semibold text-gray-900">Need Help Getting Started?</h3>
-            <p className="text-gray-600">Our system is designed to be simple. Start by adding a module, then configure your models and tables.</p>
-            <Link to="/config">
-              <Button>
-                Quick Setup Guide
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+     
     </div>
   );
 };
