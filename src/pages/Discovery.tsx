@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ReactFlowProvider } from 'reactflow';
-import { Database, Search, Sparkles, Info, RefreshCw, HelpCircle, FileText } from 'lucide-react';
-import { Card } from '@/components/ui/card';
+import { Database, Search, Sparkles, Info, RefreshCw, FileText } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -118,23 +118,24 @@ const Discovery = () => {
   }, []);
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      {/* Header with title and description */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-md">
-            <Database className="h-8 w-8 text-white" />
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* Hero header */}
+      <Card className="border-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-xl shadow-md">
+                <Database className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Data Discovery</h1>
+                <p className="text-indigo-100 mt-1">Explore database structure and discover insights</p>
+              </div>
+            </div>
+            
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Data Discovery</h1>
-            <p className="text-gray-600 mt-1">Explore your database structure and discover insights</p>
-          </div>
-        </div>
-        <Button variant="outline" size="sm" className="gap-2 self-start md:self-auto">
-          <HelpCircle className="h-4 w-4" />
-          View Documentation
-        </Button>
-      </div>
+        </CardContent>
+      </Card>
       
       {/* Info banner */}
       <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-start gap-3">
@@ -374,15 +375,7 @@ const Discovery = () => {
           If you need assistance with data discovery, please refer to our documentation
           or contact the support team.
         </p>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="outline" size="sm" className="gap-2">
-            <HelpCircle className="h-4 w-4" />
-            View Documentation
-          </Button>
-          <Button variant="secondary" size="sm" className="gap-2">
-            Contact Support
-          </Button>
-        </div>
+        
       </div>
     </div>
   );

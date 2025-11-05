@@ -1,11 +1,11 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Layers, GitBranch, Loader2, X } from 'lucide-react';
+import { Plus, Edit, Layers, GitBranch, Loader2, X, BookOpen, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
@@ -234,52 +234,58 @@ const Modules: React.FC = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Layers className="h-8 w-8 text-blue-600" />
-          <div>
-            <h1 className="text-3xl font-bold">Modules</h1>
-            <p className="text-gray-600">Manage system modules</p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="gap-2">
-                <GitBranch className="h-4 w-4" />
-                Execution Flow 
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-none max-h-none w-screen h-screen p-0 m-0 border-0">
-              <DialogHeader className="p-6 pb-2">
-                <DialogTitle>Flow Diagram</DialogTitle>
-                <DialogDescription>
-                  Explore the execution flow. Hover edges for details and click nodes to inspect.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="flex-1 h-[calc(100vh-80px)] p-6 pt-2">
-                <ExecutionFlowDiagram 
-                  height="100%"
-                  width="100%"
-                  autoFetch={true}
-                  onNodeClick={(node) => {
-                    toast({
-                      title: `${node.data.type} `,
-                      description: `name: ${node.data.label}${node.data.priority ? ` | priority : ${node.data.priority}` : ''}`,
-                    });
-                  }}
-                />
+    <div className="p-8 space-y-8">
+      {/* Hero header */}
+      <Card className="border-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-xl shadow-md">
+                <Layers className="h-8 w-8 text-white" />
               </div>
-            </DialogContent>
-          </Dialog>
-          <Button onClick={handleCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Module
-          </Button>
-        </div>
-      </div>
+              <div>
+                <h1 className="text-3xl font-bold">Modules</h1>
+                <p className="text-blue-100 mt-1">Manage system modules</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2 text-foreground border-white/40">
+                    <GitBranch className="h-4 w-4" />
+                    Execution Flow 
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-none max-h-none w-screen h-screen p-0 m-0 border-0">
+                  <DialogHeader className="p-6 pb-2">
+                    <DialogTitle>Flow Diagram</DialogTitle>
+                    <DialogDescription>
+                      Explore the execution flow. Hover edges for details and click nodes to inspect.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex-1 h-[calc(100vh-80px)] p-6 pt-2">
+                    <ExecutionFlowDiagram 
+                      height="100%"
+                      width="100%"
+                      autoFetch={true}
+                      onNodeClick={(node) => {
+                        toast({
+                          title: `${node.data.type} `,
+                          description: `name: ${node.data.label}${node.data.priority ? ` | priority : ${node.data.priority}` : ''}`,
+                        });
+                      }}
+                    />
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Button onClick={handleCreate} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Module
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Separator />
 

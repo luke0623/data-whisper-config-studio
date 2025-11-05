@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import Header from '@/components/Header';
 import { 
   Database, 
   Settings, 
@@ -16,7 +15,9 @@ import {
   Plus,
   Eye,
   TrendingUp,
-  Server
+  Server,
+  Home,
+  
 } from 'lucide-react';
 
 const Index = () => {
@@ -79,13 +80,24 @@ const Index = () => {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header with user information */}
-      <Header 
-        title="Welcome to Data MO" 
-        description="Configure your data ingestion and monitor system health"
-        showUserInfo={true}
-      />
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* Hero header */}
+      <Card className="border-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-xl shadow-md">
+                <Home className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Dashboard</h1>
+                <p className="text-blue-100 mt-1">Configure ingestion and monitor system health</p>
+              </div>
+            </div>
+            
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Quick Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -139,9 +151,9 @@ const Index = () => {
       </div>
 
       {/* Main Action Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
-        <Card className="shadow-lg">
+        <Card className="shadow-lg lg:col-span-2 rounded-2xl">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5 text-blue-600" />
@@ -209,6 +221,22 @@ const Index = () => {
                 <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-orange-600" />
               </div>
             </Link>
+          </CardContent>
+        </Card>
+
+        {/* Shortcuts */}
+        <Card className="shadow-sm rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-gray-900">Shortcuts</CardTitle>
+            <CardDescription>Quick links and resources</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <Link to="/monitor">
+              <Button variant="outline" size="sm" className="w-full justify-start gap-2">
+                <Activity className="h-4 w-4" /> View Activity
+              </Button>
+            </Link>
+            
           </CardContent>
         </Card>
 

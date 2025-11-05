@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Minus } from 'lucide-react';
+import { Database, Plus, Filter, Download, RefreshCw, Info, Eye, Edit, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Minus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -22,6 +22,7 @@ import {
   JsonColumn 
 } from '@/models/table';
 import { tableService, TableServiceError } from '@/services/tableService';
+import dataSourceService from '@/services/dataSourceService';
 
 // Helper components for complex data structures
 const ConditionEditor = ({ 
@@ -300,6 +301,11 @@ const Tables = () => {
   const [editFormErrors, setEditFormErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Data sources for dropdown
+  const [dataSources, setDataSources] = useState<any[]>([]);
+  const [dataSourcesLoading, setDataSourcesLoading] = useState<boolean>(false);
+  const [dataSourcesError, setDataSourcesError] = useState<string | null>(null);
+
   // Unique model names for filter options
   const modelNames = React.useMemo(() => {
     const names = (tables || [])
@@ -393,9 +399,29 @@ const Tables = () => {
     }
   };
 
+  // Function to fetch data sources
+  const fetchDataSources = async () => {
+    try {
+      setDataSourcesLoading(true);
+      setDataSourcesError(null);
+      const list = await dataSourceService.getAllDataSources();
+      setDataSources(list || []);
+    } catch (error) {
+      console.error('Error fetching data sources:', error);
+      setDataSourcesError('Failed to load data sources');
+      setDataSources([]);
+    } finally {
+      setDataSourcesLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchTables();
   }, [currentPage, searchTerm, selectedStatus]);
+
+  useEffect(() => {
+    fetchDataSources();
+  }, []);
 
   // Filter tables based on search term and status
   const filteredTables = (tables || []).filter((table) => {
@@ -762,26 +788,33 @@ const Tables = () => {
   // Note: Field management functions removed as CollectorTableConfig doesn't have fields property
 
   return (
-    <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      {/* Header with title and description */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl shadow-md">
-            <Database className="h-8 w-8 text-white" />
+    <div className="p-8 space-y-8 max-w-7xl mx-auto">
+      {/* Hero header */}
+      <Card className="border-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-2xl shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-xl shadow-md">
+                <Database className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Tables</h1>
+                <p className="text-indigo-100 mt-1">Manage and configure your data tables</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                className="gap-2 self-start md:self-auto"
+                onClick={() => setCreateDialogOpen(true)}
+                size="sm"
+              >
+                <Plus className="h-4 w-4" />
+                Add New Table
+              </Button>
+            </div>
           </div>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Tables</h1>
-            <p className="text-gray-600 mt-1">Manage and configure your data tables</p>
-          </div>
-        </div>
-        <Button 
-          className="gap-2 self-start md:self-auto"
-          onClick={() => setCreateDialogOpen(true)}
-        >
-          <Plus className="h-4 w-4" />
-          Add New Table
-        </Button>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Info banner */}
       <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 flex items-start gap-3">
@@ -1450,13 +1483,26 @@ const Tables = () => {
                 <h3 className="text-lg font-medium mb-4">Flags and Data Source</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="edit-data-source-id">Data Source ID</Label>
-                    <Input
-                      id="edit-data-source-id"
+                    <Label htmlFor="edit-data-source-id">Data Source</Label>
+                    <Select
                       value={editFormData.dataSourceId || ''}
-                      onChange={(e) => setEditFormData({ ...editFormData, dataSourceId: e.target.value })}
-                      placeholder="Enter data source ID"
-                    />
+                      onValueChange={(value) => setEditFormData({ ...editFormData, dataSourceId: value })}
+                    >
+                      <SelectTrigger id="edit-data-source-id">
+                        <SelectValue placeholder="Select data source" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {dataSources.map((ds) => {
+                          const id = ds.dataSourceId ?? ds.id ?? ds.name;
+                          const label = ds.name ?? id;
+                          return (
+                            <SelectItem key={id} value={String(id)}>
+                              {label}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>
@@ -1717,13 +1763,26 @@ const Tables = () => {
               <h3 className="text-lg font-medium border-b pb-2">Flags and Data Source</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="dataSourceId">Data Source ID</Label>
-                  <Input
-                    id="dataSourceId"
-                    value={createFormData.dataSourceId}
-                    onChange={(e) => setCreateFormData(prev => ({ ...prev, dataSourceId: e.target.value }))}
-                    placeholder="Enter data source ID"
-                  />
+                  <Label htmlFor="dataSourceId">Data Source</Label>
+                  <Select
+                    value={createFormData.dataSourceId || ''}
+                    onValueChange={(value) => setCreateFormData(prev => ({ ...prev, dataSourceId: value }))}
+                  >
+                    <SelectTrigger id="dataSourceId">
+                      <SelectValue placeholder="Select data source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dataSources.map((ds) => {
+                        const id = ds.dataSourceId ?? ds.id ?? ds.name;
+                        const label = ds.name ?? id;
+                        return (
+                          <SelectItem key={id} value={String(id)}>
+                            {label}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="ignoredColumns">Ignored Columns</Label>
@@ -1797,15 +1856,7 @@ const Tables = () => {
         <p className="text-gray-600 mb-4">
           Learn how to connect and configure tables for optimal data extraction.
         </p>
-        <div className="flex flex-wrap gap-3">
-          <Button variant="outline" size="sm" className="gap-2">
-            <HelpCircle className="h-4 w-4" />
-            View Documentation
-          </Button>
-          <Button variant="secondary" size="sm" className="gap-2">
-            Contact Support
-          </Button>
-        </div>
+        
       </div>
     </div>
   );

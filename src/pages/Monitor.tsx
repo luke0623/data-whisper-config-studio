@@ -200,24 +200,34 @@ const Monitor = () => {
   } = summary || {};
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Activity className="h-8 w-8 text-blue-600" />
-          <div>
-            <h1 className="text-3xl font-bold">Ingestion Monitor</h1>
-            <p className="text-gray-600">Track data ingestion events across all modules</p>
+    <div className="p-8 space-y-8">
+      {/* Hero header */}
+      <Card className="border-0 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-2xl shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-xl shadow-md">
+                <Activity className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Ingestion Monitor</h1>
+                <p className="text-teal-100 mt-1">Track data ingestion across modules</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={handleRefresh} disabled={refreshing || loading} className="gap-2">
+                {refreshing ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </Button>
+              
+            </div>
           </div>
-        </div>
-        <Button onClick={handleRefresh} disabled={refreshing || loading}>
-          {refreshing ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          {refreshing ? "Refreshing..." : "Refresh"}
-        </Button>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">

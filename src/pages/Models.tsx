@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -308,20 +308,30 @@ const Models = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Database className="h-8 w-8 text-blue-600" />
-          <div>
-            <h1 className="text-3xl font-bold">Models</h1>
-            <p className="text-gray-600">Manage domain models</p>
+    <div className="p-8 space-y-8">
+      {/* Hero header */}
+      <Card className="border-0 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl shadow-md">
+        <CardContent className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-white/20 rounded-xl shadow-md">
+                <Database className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Models</h1>
+                <p className="text-blue-100 mt-1">Manage domain models</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button onClick={handleCreate} size="sm" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Model
+              </Button>
+              
+            </div>
           </div>
-        </div>
-        <Button onClick={handleCreate} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Create Model
-        </Button>
-      </div>
+        </CardContent>
+      </Card>
 
       <Separator />
 
