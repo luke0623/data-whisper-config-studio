@@ -7,6 +7,7 @@ export { default as discoveryService } from './discoveryService';
 export { tableService } from './tableService';
 export { moduleService } from './moduleService';
 export { modelService } from './modelService';
+export { collectorService } from './collectorService';
 
 // Also export default instances for flexibility
 import apiService from './api';
@@ -15,6 +16,7 @@ import monitorService from './monitorService';
 import { tableService } from './tableService';
 import { moduleService } from './moduleService';
 import { modelService } from './modelService';
+import { collectorService } from './collectorService';
 
 export default {
   api: apiService,
@@ -22,5 +24,6 @@ export default {
   monitor: monitorService,
   table: tableService,
   module: moduleService,
-  model: modelService
+  model: modelService,
+  collector: collectorService
 };

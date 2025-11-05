@@ -304,11 +304,9 @@ export class TableService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/tables`, {
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/table/config`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getDefaultHeaders(),
         body: JSON.stringify(tableData),
       });
       if (!response.ok) throw new Error('Failed to create table');
@@ -346,11 +344,9 @@ export class TableService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/tables/${tableId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/table/config`, {
+        method: 'POST',
+        headers: getDefaultHeaders(),
         body: JSON.stringify(updateData),
       });
       if (!response.ok) throw new Error('Failed to update table');

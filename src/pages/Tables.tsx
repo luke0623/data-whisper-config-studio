@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Database, Plus, Filter, Download, RefreshCw, HelpCircle, Info, Eye, Edit, X, Trash2, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Minus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -1108,6 +1108,9 @@ const Tables = () => {
               <Eye className="h-5 w-5" />
               View Table Details - {selectedTable?.name}
             </DialogTitle>
+            <DialogDescription>
+              Inspect the selected table’s configuration, keys, and related settings.
+            </DialogDescription>
           </DialogHeader>
           {selectedTable && (
             <div className="space-y-6">
@@ -1270,6 +1273,9 @@ const Tables = () => {
               <Edit className="h-5 w-5" />
               Edit Table - {selectedTable?.name}
             </DialogTitle>
+            <DialogDescription>
+              Update table properties and configuration fields, then save changes.
+            </DialogDescription>
           </DialogHeader>
           {selectedTable && (
             <div className="space-y-6">
@@ -1534,6 +1540,9 @@ const Tables = () => {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create New Table</DialogTitle>
+            <DialogDescription>
+              Provide required information and settings to create a new table.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
             {/* Basic Information */}

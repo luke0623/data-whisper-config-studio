@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Sparkles, Play, Loader2, ArrowRight } from 'lucide-react';
@@ -10,14 +11,16 @@ import { toast } from '@/hooks/use-toast';
 import ModuleSelector from '@/components/ModuleSelector';
 import ModelSelector from '@/components/ModelSelector';
 import ConfigurationPreview from '@/components/ConfigurationPreview';
-import { configService, moduleService, modelService, tableService } from '@/services';
-import { ConfigurationData } from '@/models';
+import { configService, moduleService, modelService, tableService, collectorService } from '@/services';
 
 const ConfigurationForm = () => {
   const [selectedModule, setSelectedModule] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [isAiEnabled, setIsAiEnabled] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [testSucceeded, setTestSucceeded] = useState(false);
+  const [startTime, setStartTime] = useState<string>('');
+  const [endTime, setEndTime] = useState<string>('');
   const [activeStep, setActiveStep] = useState(1);
 
   // Ensure all services use real data instead of mock data
@@ -36,36 +39,51 @@ const ConfigurationForm = () => {
       });
       return;
     }
+    if (!startTime || !endTime) {
+      toast({
+        title: "Missing Time Range",
+        description: "Please select start and end time for the test.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (new Date(endTime) <= new Date(startTime)) {
+      toast({
+        title: "Invalid Time Range",
+        description: "End time must be after the start time.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     setIsTesting(true);
     
     try {
-      // Prepare configuration data
-      const configData: ConfigurationData = {
-        module: selectedModule,
-        model: selectedModel,
-        tables: [], // Empty tables array since we removed table selection
-        aiEnabled: isAiEnabled
-      };
-      
       toast({
         title: "Test Started",
-        description: "Testing your configuration... This may take a few moments.",
+        description: "Triggering test event for selected model...",
       });
       
-      // Call the service to test configuration
-      const response = await configService.testConfiguration(configData);
+      // Call collector service to trigger event by model
+      const payload = {
+        startTime: new Date(startTime).toISOString(),
+        endTime: new Date(endTime).toISOString(),
+        modelId: selectedModel,
+      };
+      const response = await collectorService.triggerEventByModel(payload);
       
       toast({
         title: "Test Completed",
-        description: "Your configuration test completed successfully.",
+        description: "Event triggered successfully for the selected time range.",
       });
+      setTestSucceeded(true);
     } catch (error: any) {
       toast({
         title: "Test Failed",
         description: error.message || "An error occurred while testing the configuration.",
         variant: "destructive"
       });
+      setTestSucceeded(false);
     } finally {
       setIsTesting(false);
     }
@@ -84,6 +102,14 @@ const ConfigurationForm = () => {
       setActiveStep(activeStep - 1);
     }
   };
+
+  // Reset test success state when configuration changes
+  useEffect(() => {
+    setTestSucceeded(false);
+    // Also clear time range when module/model changes to avoid stale payloads
+    setStartTime('');
+    setEndTime('');
+  }, [selectedModule, selectedModel]);
 
   return (
     <div className="space-y-8">
@@ -193,7 +219,7 @@ const ConfigurationForm = () => {
       </div>
 
       {/* Configuration Preview */}
-      {isConfigurationComplete && (
+      {/* {isConfigurationComplete && (
         <Card className="p-6 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 shadow-md">
           <div className="flex items-center gap-2 mb-4">
             <CheckCircle className="h-5 w-5 text-green-600" />
@@ -203,11 +229,40 @@ const ConfigurationForm = () => {
             module={selectedModule}
             model={selectedModel}
             tables={[]}
+            showSummary={testSucceeded}
           />
         </Card>
-      )}
+      )} */}
 
       <Separator className="my-6" />
+
+      {/* Time Range Selection */}
+      <Card className="border border-gray-200 shadow-sm">
+        <CardContent className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="startTime" className="text-sm font-medium">Start Time</Label>
+              <Input
+                id="startTime"
+                type="datetime-local"
+                value={startTime}
+                onChange={(e) => setStartTime(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <Label htmlFor="endTime" className="text-sm font-medium">End Time</Label>
+              <Input
+                id="endTime"
+                type="datetime-local"
+                value={endTime}
+                onChange={(e) => setEndTime(e.target.value)}
+                className="mt-2"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">

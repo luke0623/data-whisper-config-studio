@@ -196,8 +196,8 @@ const Modules: React.FC = () => {
         lastModifiedBy: user?.name || 'current_user'
       } as Module;
 
-      await moduleService.updateModule(selectedModule.moduleId, moduleData);
-      setModules(prev => prev.map(m => m.moduleId === selectedModule.moduleId ? moduleData : m));
+      const updatedModule = await moduleService.updateModule(selectedModule.moduleId, moduleData);
+      setModules(prev => prev.map(m => m.moduleId === selectedModule.moduleId ? updatedModule : m));
       setEditDialogOpen(false);
       setSelectedModule(null);
       setEditFormData({});

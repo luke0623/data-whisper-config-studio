@@ -8,12 +8,14 @@ interface ConfigurationPreviewProps {
   module: string;
   model: string;
   tables: string[];
+  showSummary?: boolean;
 }
 
 const ConfigurationPreview: React.FC<ConfigurationPreviewProps> = ({
   module,
   model,
-  tables
+  tables,
+  showSummary = true,
 }) => {
   const formatName = (id: string) => {
     return id.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
@@ -69,18 +71,20 @@ const ConfigurationPreview: React.FC<ConfigurationPreviewProps> = ({
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-100 shadow-sm">
-        <h4 className="text-sm font-semibold text-gray-800 mb-2">Configuration Summary</h4>
-        <p className="text-sm text-gray-700">
-          This configuration will extract data from <span className="font-medium">{tables.length} table{tables.length > 1 ? 's' : ''}</span> in 
-          the <span className="font-medium text-purple-700">{formatName(model)}</span> model within 
-          the <span className="font-medium text-blue-700">{formatName(module)}</span> module.
-        </p>
-        <div className="mt-3 flex items-center gap-2 text-xs text-green-700">
-          <CheckCircle className="h-4 w-4" />
-          <span>Ready for deployment</span>
+      {showSummary && (
+        <div className="bg-gradient-to-r from-blue-50 to-green-50 p-4 rounded-lg border border-blue-100 shadow-sm">
+          <h4 className="text-sm font-semibold text-gray-800 mb-2">Configuration Summary</h4>
+          <p className="text-sm text-gray-700">
+            This configuration will extract data from <span className="font-medium">{tables.length} table{tables.length > 1 ? 's' : ''}</span> in 
+            the <span className="font-medium text-purple-700">{formatName(model)}</span> model within 
+            the <span className="font-medium text-blue-700">{formatName(module)}</span> module.
+          </p>
+          <div className="mt-3 flex items-center gap-2 text-xs text-green-700">
+            <CheckCircle className="h-4 w-4" />
+            <span>Ready for deployment</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
