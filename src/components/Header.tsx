@@ -73,7 +73,7 @@ const Header: React.FC<HeaderProps> = ({
 
       {/* Regular header section */}
       <div className="flex items-center gap-3">
-        <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+        {/* <h1 className="text-3xl font-bold tracking-tight">{title}</h1> */}
         {showAIBadge && (
           <Badge variant="outline" className="bg-gradient-to-r from-purple-500 to-blue-500 text-white border-0 flex items-center gap-1 px-3 py-1 h-6">
             <Sparkles className="h-3.5 w-3.5" />
@@ -81,9 +81,9 @@ const Header: React.FC<HeaderProps> = ({
           </Badge>
         )}
       </div>
-      {description && (
+      {/* {description && (
         <p className="text-muted-foreground">{description}</p>
-      )}
+      )} */}
     </div>
   );
 };

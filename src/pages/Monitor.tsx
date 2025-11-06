@@ -1,221 +1,182 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import React, { useState, useEffect, useCallback, Suspense, useMemo, useRef, useTransition, useDeferredValue } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Activity, CheckCircle, XCircle, Clock, RefreshCw, AlertTriangle, Loader2 } from 'lucide-react';
-import { monitorService, moduleService } from '@/services';
-import { IngestionEvent, MonitoringSummary, Module } from '@/models';
+import { Activity, RefreshCw, Loader2 } from 'lucide-react';
+import { collectorService } from '@/services';
+import { EventTriggerItem, PaginatedEventsResponse, EventResultRecord } from '@/models/monitor.models';
 import { toast } from '@/hooks/use-toast';
+import Skeleton from '@/components/monitor/Skeleton';
+import EventsTable from '@/components/monitor/EventsTable';
+const EventDetailsPanel = React.lazy(() => import('@/components/monitor/EventDetailsPanel'));
+
+// Trigger type display mapping
+const TRIGGER_TYPE_LABELS: Record<number, string> = {
+  1: 'DEFAULT',
+  2: 'BY_TABLE',
+  3: 'BY_RECORD',
+  4: 'BY_PIPELINE',
+  5: 'BY_SCHEDULE',
+};
 
 const Monitor = () => {
-  const [selectedModule, setSelectedModule] = useState('all');
+  // Pagination state for first-level events
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [eventsPage, setEventsPage] = useState<PaginatedEventsResponse | null>(null);
+  const [loadingEvents, setLoadingEvents] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [ingestionEvents, setIngestionEvents] = useState<IngestionEvent[]>([]);
-  const [summary, setSummary] = useState<MonitoringSummary | null>(null);
-  const [availableModules, setAvailableModules] = useState<Module[]>([]);
+  // Filters
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const deferredQuery = useDeferredValue(query);
+  const [isPending, startTransition] = useTransition();
 
-  // Fetch ingestion events on component mount
-  useEffect(() => {
-    fetchIngestionEvents();
-  }, []);
+  // Second-level details state
+  const [selectedEvent, setSelectedEvent] = useState<EventTriggerItem | null>(null);
+  const [records, setRecords] = useState<EventResultRecord[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
 
-  // Fetch available modules on component mount (real data)
+  // Performance metrics
+  const perfRef = useRef({
+    eventsFetchMs: 0,
+    eventsRenderMs: 0,
+    recordsFetchMs: 0,
+    recordsRenderMs: 0,
+  });
+
+  // Fetch first-level events when pageNumber/pageSize changes
   useEffect(() => {
-    const loadModules = async () => {
+    const fetchEvents = async () => {
+      setLoadingEvents(true);
       try {
-        const mods = await moduleService.getAllModules();
-        setAvailableModules(mods);
+        const t0 = performance.now();
+        const data = await collectorService.getMonitorEvents({ pageNumber, pageSize });
+        const t1 = performance.now();
+        perfRef.current.eventsFetchMs = Math.round(t1 - t0);
+        startTransition(() => setEventsPage(data));
       } catch (error: any) {
         toast({
-          title: 'Error Fetching Modules',
-          description: error?.message || 'Failed to fetch modules',
+          title: 'Error Fetching Events',
+          description: error?.message || 'Failed to fetch event triggers',
           variant: 'destructive',
         });
+        startTransition(() => setEventsPage({ pageNumber, pageSize, data: [] }));
+      } finally {
+        setLoadingEvents(false);
       }
     };
-    loadModules();
-  }, []);
+    fetchEvents();
+  }, [pageNumber, pageSize]);
 
-  // Fetch ingestion events when selected module changes
+  // Measure render time when events page updates
   useEffect(() => {
-    if (!loading) {
-      fetchIngestionEvents();
-    }
-  }, [selectedModule]);
+    const t0 = performance.now();
+    // Next tick after state applied
+    const id = requestAnimationFrame(() => {
+      const t1 = performance.now();
+      perfRef.current.eventsRenderMs = Math.round(t1 - t0);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [eventsPage]);
 
-  // Fetch ingestion events from API
-  const fetchIngestionEvents = async () => {
-    setLoading(true);
+  // Load records for selected event
+  const loadEventRecords = useCallback(async (event: EventTriggerItem) => {
+    startTransition(() => setSelectedEvent(event));
+    setLoadingRecords(true);
     try {
-      let response;
-      
-      if (selectedModule === 'all') {
-        response = await monitorService.getIngestionEvents();
-        const summaryResponse = await monitorService.getMonitoringSummary();
-        setSummary(summaryResponse.data);
-      } else {
-        response = await monitorService.getIngestionEventsByModule(selectedModule);
-        const summaryResponse = await monitorService.getModuleMonitoringSummary(selectedModule);
-        setSummary(summaryResponse.data);
-      }
-      
-      setIngestionEvents(response.data);
+      const t0 = performance.now();
+      const data = await collectorService.getMonitorEventRecords(event.eventTriggerId);
+      const t1 = performance.now();
+      perfRef.current.recordsFetchMs = Math.round(t1 - t0);
+      startTransition(() => setRecords(data || []));
     } catch (error: any) {
       toast({
-        title: "Error Fetching Data",
-        description: error.message || "Failed to fetch ingestion events",
-        variant: "destructive"
+        title: 'Error Fetching Details',
+        description: error?.message || 'Failed to fetch event result records',
+        variant: 'destructive',
       });
-      // Fallback to mock data for demo purposes
-      const mockEvents = [
-    {
-      id: 1,
-      module: 'Policy Management',
-      model: 'Policy',
-      table: 'policies',
-      status: 'success',
-      recordsProcessed: 1250,
-      startTime: '2024-01-15 09:30:00',
-      endTime: '2024-01-15 09:35:22',
-      duration: '5m 22s',
-      errors: 0,
-      warnings: 2
-    },
-    {
-      id: 2,
-      module: 'Claims',
-      model: 'Claim',
-      table: 'claims_data',
-      status: 'failed',
-      recordsProcessed: 0,
-      startTime: '2024-01-15 10:15:00',
-      endTime: '2024-01-15 10:16:45',
-      duration: '1m 45s',
-      errors: 1,
-      warnings: 0
-    },
-    {
-      id: 3,
-      module: 'Finance',
-      model: 'Transaction',
-      table: 'financial_records',
-      status: 'running',
-      recordsProcessed: 892,
-      startTime: '2024-01-15 11:00:00',
-      endTime: null,
-      duration: '15m 30s',
-      errors: 0,
-      warnings: 5
-    },
-    {
-      id: 4,
-      module: 'Customer Management',
-      model: 'Customer',
-      table: 'customers',
-      status: 'success',
-      recordsProcessed: 567,
-      startTime: '2024-01-15 08:45:00',
-      endTime: '2024-01-15 08:48:15',
-      duration: '3m 15s',
-      errors: 0,
-      warnings: 0
-    },
-    {
-      id: 5,
-      module: 'Reinsurance',
-      model: 'Reinsurance Policy',
-      table: 'reinsurance_data',
-      status: 'warning',
-      recordsProcessed: 234,
-      startTime: '2024-01-15 07:30:00',
-      endTime: '2024-01-15 07:33:45',
-      duration: '3m 45s',
-      errors: 0,
-      warnings: 12
-    }
-      ];
-      setIngestionEvents(mockEvents as IngestionEvent[]);
+      startTransition(() => setRecords([]));
     } finally {
-      setLoading(false);
+      setLoadingRecords(false);
     }
-  };
+  }, []);
 
-  // Map moduleId -> moduleName for local filtering alignment
-  const moduleIdToName = useMemo(() => new Map<string, string>(
-    availableModules.map((m) => [m.moduleId, m.moduleName])
-  ), [availableModules]);
+  useEffect(() => {
+    const t0 = performance.now();
+    const id = requestAnimationFrame(() => {
+      const t1 = performance.now();
+      perfRef.current.recordsRenderMs = Math.round(t1 - t0);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [records, loadingRecords]);
 
-  const filteredEvents = selectedModule === 'all'
-    ? ingestionEvents
-    : ingestionEvents.filter((event) => event.module === (moduleIdToName.get(selectedModule) || selectedModule));
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      case 'running':
-        return <Clock className="h-4 w-4 text-blue-600" />;
-      case 'warning':
-        return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-gray-600" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      success: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      running: 'bg-blue-100 text-blue-800',
-      warning: 'bg-yellow-100 text-yellow-800'
-    };
-    
-    return (
-      <Badge className={variants[status as keyof typeof variants]}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchIngestionEvents();
-    setRefreshing(false);
-  };
+    try {
+      const t0 = performance.now();
+      const events = await collectorService.getMonitorEvents({ pageNumber, pageSize });
+      const t1 = performance.now();
+      perfRef.current.eventsFetchMs = Math.round(t1 - t0);
+      startTransition(() => setEventsPage(events));
+      // If an event is selected, refresh its records
+      if (selectedEvent) {
+        const r0 = performance.now();
+        const res = await collectorService.getMonitorEventRecords(selectedEvent.eventTriggerId);
+        const r1 = performance.now();
+        perfRef.current.recordsFetchMs = Math.round(r1 - r0);
+        startTransition(() => setRecords(res || []));
+      }
+    } catch (error: any) {
+      toast({
+        title: 'Refresh Failed',
+        description: error?.message || 'Failed to refresh data',
+        variant: 'destructive',
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [pageNumber, pageSize, selectedEvent]);
 
-  // Use summary from API if available, otherwise calculate locally
-  const {
-    totalEvents = filteredEvents.length,
-    successfulEvents = filteredEvents.filter(e => e.status === 'success').length,
-    failedEvents = filteredEvents.filter(e => e.status === 'failed').length,
-    runningEvents = filteredEvents.filter(e => e.status === 'running').length,
-    warningEvents = filteredEvents.filter(e => e.status === 'warning').length,
-    successRate = totalEvents > 0 ? Math.round((successfulEvents / totalEvents) * 100) : 0
-  } = summary || {};
+  const eventsCount = useMemo(() => (eventsPage?.data?.length ?? 0), [eventsPage]);
+  const filteredEventsPage = useMemo<PaginatedEventsResponse | null>(() => {
+    if (!eventsPage) return null;
+    const q = deferredQuery.trim().toLowerCase();
+    const matchStatus = (evt: EventTriggerItem) => {
+      if (statusFilter === 'all') return true;
+      try {
+        const num = Number(statusFilter);
+        return evt.status === num;
+      } catch {
+        return true;
+      }
+    };
+    const data = eventsPage.data.filter(evt => {
+      const hit = !q
+        || (evt.tableName?.toLowerCase().includes(q))
+        || (String(evt.eventTriggerId).includes(q));
+      return hit && matchStatus(evt);
+    });
+    return { ...eventsPage, data };
+  }, [eventsPage, deferredQuery, statusFilter]);
 
   return (
-    <div className="p-8 space-y-8">
+    <div className="p-6 space-y-6">
       {/* Hero header */}
       <Card className="border-0 bg-gradient-to-r from-teal-600 to-blue-600 text-white rounded-2xl shadow-md">
-        <CardContent className="p-6">
+        <CardContent className="p-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div className="flex items-start gap-4">
               <div className="p-3 bg-white/20 rounded-xl shadow-md">
                 <Activity className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Ingestion Monitor</h1>
+                <h1 className="text-2xl md:text-3xl font-bold">Ingestion Monitor</h1>
                 <p className="text-teal-100 mt-1">Track data ingestion across modules</p>
               </div>
             </div>
             <div className="flex gap-3">
-              <Button onClick={handleRefresh} disabled={refreshing || loading} className="gap-2">
+              <Button onClick={handleRefresh} disabled={refreshing || loadingEvents} className="gap-2 bg-white text-teal-700 hover:bg-teal-50">
                 {refreshing ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -228,141 +189,114 @@ const Monitor = () => {
           </div>
         </CardContent>
       </Card>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Events</p>
-                <p className="text-2xl font-bold">{totalEvents}</p>
+      {/* Two-level UI: Event triggers on top, details below */}
+      <div className="grid grid-cols-1 gap-4">
+        {/* First-level: Event triggers */}
+        <Card className="rounded-xl">
+          <CardHeader>
+            <CardTitle>Event Triggers</CardTitle>
+            <CardDescription className="flex items-center justify-between">
+              <span>List of triggered events with pagination</span>
+              <span className="text-xs text-gray-500">{eventsCount} items</span>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* Filter bar */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search by table or event ID"
+                  className="w-full md:w-64 px-3 py-2 border rounded-md text-sm"
+                  aria-label="Search events"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border rounded-md text-sm"
+                  aria-label="Filter by status"
+                >
+                  <option value="all">All status</option>
+                  <option value="0">Status #0</option>
+                  <option value="1">Status #1</option>
+                  <option value="2">Status #2</option>
+                  <option value="3">Status #3</option>
+                </select>
               </div>
-              <Activity className="h-8 w-8 text-blue-600" />
+              <div className="flex items-center gap-2">
+                <label htmlFor="pageSize" className="text-sm text-gray-600">Page size</label>
+                <select
+                  id="pageSize"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="px-3 py-2 border rounded-md text-sm"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
             </div>
+            {loadingEvents ? (
+              <div className="py-6 space-y-3">
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+                <Skeleton className="h-6 w-full" />
+              </div>
+            ) : (
+              <>
+                <EventsTable
+                  eventsPage={filteredEventsPage}
+                  selectedEvent={selectedEvent}
+                  onSelectEvent={loadEventRecords}
+                  typeLabelMap={TRIGGER_TYPE_LABELS}
+                />
+
+                {/* Pagination controls */}
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-gray-600">
+                    Page {eventsPage?.pageNumber ?? pageNumber} · Size {eventsPage?.pageSize ?? pageSize} · Items {(eventsPage?.data || []).length}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
+                      disabled={pageNumber <= 1 || loadingEvents}
+                    >
+                      Prev
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setPageNumber(pageNumber + 1)}
+                      disabled={loadingEvents || (eventsPage && (eventsPage.data?.length ?? 0) < pageSize)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Success Rate</p>
-                <p className="text-2xl font-bold text-green-600">{successRate}%</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Failed</p>
-                <p className="text-2xl font-bold text-red-600">{failedEvents}</p>
-              </div>
-              <XCircle className="h-8 w-8 text-red-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Running</p>
-                <p className="text-2xl font-bold text-blue-600">{runningEvents}</p>
-              </div>
-              <Clock className="h-8 w-8 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Warnings</p>
-                <p className="text-2xl font-bold text-yellow-600">{warningEvents}</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Second-level: Details (stacked below) */}
+        <div className={`transition-all ${selectedEvent ? 'opacity-100 translate-y-0' : 'opacity-95 translate-y-[2px]'} duration-300`}>
+          <Suspense fallback={<Card><CardContent><div className="py-6 space-y-3"><Skeleton className="h-6 w-full" /><Skeleton className="h-6 w-full" /></div></CardContent></Card>}>
+            <EventDetailsPanel selectedEvent={selectedEvent} records={records} loadingRecords={loadingRecords} />
+          </Suspense>
+        </div>
       </div>
 
-      {/* Filter and Events Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Ingestion Events</CardTitle>
-              <CardDescription>Monitor the status of data ingestion across all modules</CardDescription>
-            </div>
-            <Select value={selectedModule} onValueChange={setSelectedModule}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by module" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Modules</SelectItem>
-                {availableModules.map((module) => (
-                  <SelectItem key={module.moduleId} value={module.moduleId}>
-                    {module.moduleName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Status</TableHead>
-                <TableHead>Module</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Table</TableHead>
-                <TableHead>Records</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Start Time</TableHead>
-                <TableHead>Errors</TableHead>
-                <TableHead>Warnings</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredEvents.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(event.status)}
-                      {getStatusBadge(event.status)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{event.module}</TableCell>
-                  <TableCell>{event.model}</TableCell>
-                  <TableCell className="font-mono text-sm">{event.table}</TableCell>
-                  <TableCell>{event.recordsProcessed.toLocaleString()}</TableCell>
-                  <TableCell>{event.duration}</TableCell>
-                  <TableCell>{event.startTime}</TableCell>
-                  <TableCell>
-                    {event.errors > 0 ? (
-                      <span className="text-red-600 font-medium">{event.errors}</span>
-                    ) : (
-                      <span className="text-gray-400">0</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {event.warnings > 0 ? (
-                      <span className="text-yellow-600 font-medium">{event.warnings}</span>
-                    ) : (
-                      <span className="text-gray-400">0</span>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      Performance summary
+      <Card className="rounded-xl">
+        <CardContent className="text-sm text-gray-600 flex flex-wrap gap-4 p-3">
+          <div>Events fetch: <span className="font-mono">{perfRef.current.eventsFetchMs} ms</span></div>
+          <div>Events render: <span className="font-mono">{perfRef.current.eventsRenderMs} ms</span></div>
+          <div>Records fetch: <span className="font-mono">{perfRef.current.recordsFetchMs} ms</span></div>
+          <div>Records render: <span className="font-mono">{perfRef.current.recordsRenderMs} ms</span></div>
+          {isPending && <div className="text-xs text-teal-700">Updating view…</div>}
         </CardContent>
       </Card>
     </div>

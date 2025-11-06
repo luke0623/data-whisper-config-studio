@@ -62,10 +62,23 @@ const ConfigurationForm = () => {
         description: "Triggering test event for selected model...",
       });
       
+      // Format datetime values to MySQL DATETIME (YYYY-MM-DD HH:mm:ss) without timezone
+      const formatToMySQLDateTime = (input: string) => {
+        const d = new Date(input);
+        const pad = (n: number) => n.toString().padStart(2, '0');
+        const year = d.getFullYear();
+        const month = pad(d.getMonth() + 1);
+        const day = pad(d.getDate());
+        const hours = pad(d.getHours());
+        const minutes = pad(d.getMinutes());
+        const seconds = pad(d.getSeconds());
+        return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      };
+
       // Call collector service to trigger event by model
       const payload = {
-        startTime: new Date(startTime).toISOString(),
-        endTime: new Date(endTime).toISOString(),
+        startTime: formatToMySQLDateTime(startTime),
+        endTime: formatToMySQLDateTime(endTime),
         modelId: selectedModel,
       };
       const response = await collectorService.triggerEventByModel(payload);

@@ -82,13 +82,7 @@ const Config = () => {
             </CardContent>
           </Card>
 
-          <Card className="border border-gray-200 rounded-2xl shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-gray-900">Shortcuts</CardTitle>
-              <CardDescription>Access documentation and support resources</CardDescription>
-            </CardHeader>
-            
-          </Card>
+          
         </div>
       </div>
     </div>

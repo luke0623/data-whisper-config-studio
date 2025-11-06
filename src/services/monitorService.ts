@@ -1,6 +1,6 @@
 import apiService from './api';
 import { ApiResponse } from '../models/api.models';
-import { IngestionEvent, MonitoringSummary } from '../models/monitor.models';
+import { IngestionEvent, MonitoringSummary, PaginatedEventsResponse, EventResultRecord } from '../models/monitor.models';
 
 // Monitoring service class
 class MonitorService {
@@ -39,6 +39,17 @@ class MonitorService {
   // Get detailed logs for an ingestion event
   public async getIngestionEventLogs(eventId: number): Promise<ApiResponse<any>> {
     return apiService.get<any>(`${this.baseUrl}/events/${eventId}/logs`);
+  }
+
+  // ===== New APIs: Event triggers and detailed records (two-level UI) =====
+  // Get paginated event triggers
+  public async getEventTriggers(pageNumber: number, pageSize: number): Promise<ApiResponse<PaginatedEventsResponse>> {
+    return apiService.get<PaginatedEventsResponse>(`${this.baseUrl}/events/triggers`, { pageNumber, pageSize });
+  }
+
+  // Get detailed event result records by eventTriggerId
+  public async getEventResultRecords(eventTriggerId: number): Promise<ApiResponse<EventResultRecord[]>> {
+    return apiService.get<EventResultRecord[]>(`${this.baseUrl}/events/${eventTriggerId}/records`);
   }
 }
 
