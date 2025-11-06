@@ -10,7 +10,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
   const { user, isLoading } = useAuth();
   const location = useLocation();
 
-  // 显示加载状态
+  // Show loading state
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -22,12 +22,12 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children }) => {
     );
   }
 
-  // 如果用户未登录，重定向到登录页面，并保存当前路径
+  // If user is not logged in, redirect to login and preserve current path
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 用户已登录，显示受保护的内容
+  // User is logged in, show protected content
   return <>{children}</>;
 };
 
