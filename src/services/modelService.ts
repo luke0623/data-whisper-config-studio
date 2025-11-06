@@ -177,7 +177,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/all`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/all`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -282,7 +282,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/${encodeURIComponent(modelId)}`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/${encodeURIComponent(modelId)}`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -321,7 +321,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/`, {
         method: 'POST',
         headers: getDefaultHeaders(),
         body: JSON.stringify(modelData),
@@ -372,8 +372,8 @@ export class ModelService {
     }
 
     try {
-      // console.log('Making API call to:', `${API_BASE_URL}/watchmen/ingest/config/model`);
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/`, {
+      
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/`, {
         method: 'POST',
         headers: getDefaultHeaders(),
         body: JSON.stringify({
@@ -424,7 +424,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/${encodeURIComponent(modelId)}`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/${encodeURIComponent(modelId)}`, {
         method: 'DELETE',
         headers: getDefaultHeaders()
       });
@@ -475,7 +475,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/batch`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/batch`, {
         method: 'DELETE',
         headers: getDefaultHeaders(),
         body: JSON.stringify({ modelIds }),
@@ -526,7 +526,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/module/${encodeURIComponent(moduleId)}`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/module/${encodeURIComponent(moduleId)}`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -557,7 +557,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/tenant/${encodeURIComponent(tenantId)}`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/tenant/${encodeURIComponent(tenantId)}`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -629,7 +629,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/search?${queryParams}`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/search?${queryParams}`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -681,7 +681,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/stats`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/stats`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -726,7 +726,7 @@ export class ModelService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/model/health`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/model/health`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });

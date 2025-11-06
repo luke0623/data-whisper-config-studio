@@ -8,7 +8,7 @@ export interface TriggerEventRequest {
 
 class CollectorService {
   async triggerEventByModel(payload: TriggerEventRequest): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/watchmen/collector/trigger/event/model`, {
+    const response = await fetch(`${API_BASE_URL}/collector/trigger/event/model`, {
       method: 'POST',
       headers: getDefaultHeaders(),
       body: JSON.stringify(payload),

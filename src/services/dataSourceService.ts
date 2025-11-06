@@ -55,7 +55,7 @@ export class DataSourceService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/datasource/all`, {
+      const response = await fetch(`${API_BASE_URL}/datasource/all`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });

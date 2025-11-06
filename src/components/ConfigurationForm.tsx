@@ -1,17 +1,15 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { CheckCircle, Sparkles, Play, Loader2, ArrowRight } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import ModuleSelector from '@/components/ModuleSelector';
 import ModelSelector from '@/components/ModelSelector';
-import ConfigurationPreview from '@/components/ConfigurationPreview';
-import { configService, moduleService, modelService, tableService, collectorService } from '@/services';
+import { moduleService, modelService, tableService, collectorService } from '@/services';
 
 const ConfigurationForm = () => {
   const [selectedModule, setSelectedModule] = useState('');

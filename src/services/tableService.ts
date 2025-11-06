@@ -179,7 +179,7 @@ export class TableService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/config/table/all`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/config/table/all`, {
         method: 'GET',
         headers: getDefaultHeaders()
       });
@@ -196,9 +196,9 @@ export class TableService {
     } catch (error) {
       console.error('Error fetching tables:', error);
       // Fallback to mock data if enabled
-      if (this.useMockData) {
-        return mockTables;
-      }
+      // if (this.useMockData) {
+      //   return mockTables;
+      // }
       throw new TableServiceError(
         'Failed to fetch tables',
         undefined,
@@ -304,7 +304,7 @@ export class TableService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/table/config`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/table/config`, {
         method: 'POST',
         headers: getDefaultHeaders(),
         body: JSON.stringify(tableData),
@@ -344,7 +344,7 @@ export class TableService {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/watchmen/ingest/table/config`, {
+      const response = await fetch(`${API_BASE_URL}/ingest/table/config`, {
         method: 'POST',
         headers: getDefaultHeaders(),
         body: JSON.stringify(updateData),
