@@ -3,7 +3,7 @@ import { Node, Edge, MarkerType } from 'reactflow';
 import { flowDataService, FlowRelationshipData } from '../services/flowDataService';
 import { ModuleNodeData, ModelNodeData } from '../components/flow/FlowNodes';
 
-// Hook状态类型
+// Hook state type
 export interface UseFlowDataState {
   nodes: Node[];
   edges: Edge[];
@@ -11,33 +11,33 @@ export interface UseFlowDataState {
   error: string | null;
   refetch: () => Promise<void>;
   clearCache: () => void;
-  // 获取方法
+  // Access methods
   getModuleNodes: () => Node<ModuleNodeData>[];
   getModelsByModule: (moduleId: string) => Node<ModelNodeData>[];
   getAllEdges: () => Edge[];
-  // 获取关系
+  // Relationship getters
   getModuleRelations: (moduleId: string) => Edge[];
   getModelRelations: (modelId: string) => Edge[];
 }
 
-// 布局配置
+// Layout configuration
 const LAYOUT_CONFIG = {
   nodeSpacing: { x: 250, y: 120 },
   startPosition: { x: 100, y: 100 },
   moduleToModel: 200,
 };
 
-// 数据缓存接口
+// Data cache interface
 interface FlowDataCache {
   allNodes: Node[];
   allEdges: Edge[];
   moduleNodes: Node<ModuleNodeData>[];
   modelNodes: Node<ModelNodeData>[];
-  // 关系映射缓存
+  // Relationship mapping cache
   moduleToModels: Map<string, Node<ModelNodeData>[]>;
   moduleRelations: Map<string, Edge[]>;
   modelRelations: Map<string, Edge[]>;
-  // 基于优先级的模块边
+  // Priority-based module edges
   priorityEdges: Edge[];
 }
 
@@ -46,7 +46,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 使用 useMemo 缓存转换后的数据，避免不必要的重新计算
+  // Use useMemo to cache transformed data to avoid unnecessary recomputation
   const dataCache = useMemo<FlowDataCache | null>(() => {
     if (!rawData) return null;
 
@@ -61,7 +61,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     let nodeId = 0;
     const getNextId = () => `node-${++nodeId}`;
     
-    // 按优先级分组并纵向堆叠模块节点
+    // Group modules by priority and vertically stack module nodes
     const sortedModules = [...rawData.modules].sort((a, b) => (a.priority || 0) - (b.priority || 0));
     const modulesByPriority = new Map<number, typeof sortedModules>();
     sortedModules.forEach((m) => {
@@ -108,10 +108,10 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     
     allNodes.push(...moduleNodes);
     
-    // 按优先级排序模型
+    // Sort models by priority
     const sortedModels = [...rawData.models].sort((a, b) => (a.priority || 0) - (b.priority || 0));
     
-    // 创建模型节点
+    // Create model nodes
     const modelNodes: Node<ModelNodeData>[] = sortedModels.map((model, index) => {
       const id = getNextId();
       return {
@@ -144,7 +144,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       modelIds: modelNodes.map(n => ({ id: n.id, modelId: n.data.modelId, dependOn: n.data.dependOn }))
     });
     
-    // 创建边：模型到模块的连接
+    // Create edges: models to modules
     modelNodes.forEach(modelNode => {
       if (modelNode.data.moduleId) {
         const relatedModule = moduleNodes.find(moduleNode => 
@@ -178,7 +178,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       }
     });
 
-    // 创建边：模型依赖关系
+    // Create edges: model dependencies
     modelNodes.forEach(modelNode => {
       if (modelNode.data.dependOn) {
         const dependentModel = modelNodes.find(node => 
@@ -213,7 +213,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       }
     });
 
-    // 基于优先级创建模块之间的连接边（从每个优先级组连接到下一个组）
+    // Create priority-based edges between modules (connect each priority group to the next)
     const priorityEdges: Edge[] = [];
     for (let gi = 0; gi < priorities.length - 1; gi++) {
       const currentGroup = moduleNodesByPriority.get(priorities[gi])!;
@@ -267,7 +267,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       }))
     });
 
-    // 验证边的源和目标节点是否存在
+    // Validate that edge source and target nodes exist
     console.log('[useFlowData] Edge validation:', {
       totalEdges: allEdges.length,
       totalNodes: allNodes.length,
@@ -285,22 +285,22 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       }))
     });
 
-    // 将优先级模块边加入总边集合（用于关系缓存和默认视图）
+    // Add priority module edges to the overall set (for relationship cache and default view)
     allEdges.push(...priorityEdges);
 
-    // 构建关系映射缓存
+    // Build relationship mapping cache
     const moduleToModels = new Map<string, Node<ModelNodeData>[]>();
     const moduleRelations = new Map<string, Edge[]>();
     const modelRelations = new Map<string, Edge[]>();
 
-    // 缓存模块到模型的映射
+    // Cache mapping from modules to models
     moduleNodes.forEach(moduleNode => {
       const relatedModels = modelNodes.filter(modelNode => 
         modelNode.data.moduleId === moduleNode.data.moduleId
       );
       moduleToModels.set(moduleNode.data.moduleId, relatedModels);
       
-      // 缓存模块相关的边
+      // Cache edges related to modules
       const relatedEdges = allEdges.filter(edge => 
         edge.source === moduleNode.id ||
         edge.target === moduleNode.id || 
@@ -309,7 +309,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
       moduleRelations.set(moduleNode.data.moduleId, relatedEdges);
     });
 
-    // 缓存模型相关的边
+    // Cache edges related to models
     modelNodes.forEach(modelNode => {
       const relatedEdges = allEdges.filter(edge => 
         edge.source === modelNode.id || edge.target === modelNode.id
@@ -329,7 +329,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     };
   }, [rawData]);
 
-  // 导出的节点和边（默认显示模块和基于优先级的模块连接）
+  // Exported nodes and edges (default shows modules and priority-based module connections)
   const { nodes, edges } = useMemo(() => {
     if (!dataCache) {
       return { nodes: [], edges: [] };
@@ -349,7 +349,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     };
   }, [dataCache]);
 
-  // 数据访问方法
+  // Data access methods
   const getModuleNodes = useCallback(() => {
     return dataCache?.moduleNodes || [];
   }, [dataCache]);
@@ -370,7 +370,7 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     return dataCache?.modelRelations.get(modelId) || [];
   }, [dataCache]);
 
-  // 获取数据
+  // Fetch data
   const fetchData = useCallback(async () => {
     console.log('[useFlowData] Starting data fetch...');
     setIsLoading(true);
@@ -392,18 +392,18 @@ export const useFlowData = (autoFetch = true): UseFlowDataState => {
     }
   }, []);
 
-  // 重新获取数据
+  // Refetch data
   const refetch = useCallback(async () => {
     await fetchData();
   }, [fetchData]);
 
-  // 清除缓存
+  // Clear cache
   const clearCache = useCallback(() => {
     flowDataService.clearCache();
     setRawData(null);
   }, []);
 
-  // 自动获取数据
+  // Auto fetch data
   useEffect(() => {
     if (autoFetch) {
       fetchData();

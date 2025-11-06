@@ -84,13 +84,11 @@ export interface ModuleStats {
     byTenant: Record<string, number>;
     byVersion: Record<string, number>;
     byPriority: Record<number, number>;
-    recentlyCreated: number; // 最近7天创建的模块数量
-    recentlyModified: number; // 最近7天修改的模块数量
+    recentlyCreated: number; 
+    recentlyModified: number; 
 }
 
-/**
- * 批量操作结果接口
- */
+
 export interface BatchOperationResult {
     success: string[];
     failed: Array<{
