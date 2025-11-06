@@ -64,6 +64,9 @@ const Index = () => {
   // Mock statistics
   const stats = {
     totalModules: 8,
+    // dashboard totals
+    totalModels: 12,
+    totalTables: 34,
     activeIngestions: 3,
     successRate: 94,
     lastUpdate: "2 minutes ago"
@@ -123,8 +126,8 @@ const Index = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-600">Success Rate</p>
-                <p className="text-2xl font-bold text-green-700">{stats.successRate}%</p>
+                <p className="text-sm font-medium text-green-600">Total Models</p>
+                <p className="text-2xl font-bold text-green-700">{stats.totalModels}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-600" />
             </div>
@@ -135,8 +138,8 @@ const Index = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-orange-600">Active Jobs</p>
-                <p className="text-2xl font-bold text-orange-700">{stats.activeIngestions}</p>
+                <p className="text-sm font-medium text-orange-600">Total Tables</p>
+                <p className="text-2xl font-bold text-orange-700">{stats.totalTables}</p>
               </div>
               <Activity className="h-8 w-8 text-orange-600" />
             </div>

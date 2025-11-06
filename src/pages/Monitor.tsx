@@ -289,16 +289,7 @@ const Monitor = () => {
         </div>
       </div>
 
-      Performance summary
-      <Card className="rounded-xl">
-        <CardContent className="text-sm text-gray-600 flex flex-wrap gap-4 p-3">
-          <div>Events fetch: <span className="font-mono">{perfRef.current.eventsFetchMs} ms</span></div>
-          <div>Events render: <span className="font-mono">{perfRef.current.eventsRenderMs} ms</span></div>
-          <div>Records fetch: <span className="font-mono">{perfRef.current.recordsFetchMs} ms</span></div>
-          <div>Records render: <span className="font-mono">{perfRef.current.recordsRenderMs} ms</span></div>
-          {isPending && <div className="text-xs text-teal-700">Updating view…</div>}
-        </CardContent>
-      </Card>
+     
     </div>
   );
 };

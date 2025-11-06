@@ -12,6 +12,52 @@ interface EventsTableProps {
   typeLabelMap?: Record<number, string>;
 }
 
+// --- Time formatting helpers (business-friendly) ---
+function parseDate(raw?: string | null): Date | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function formatTimestamp(date: Date): string {
+  const y = date.getFullYear();
+  const m = pad2(date.getMonth() + 1);
+  const d = pad2(date.getDate());
+  const hh = pad2(date.getHours());
+  const mm = pad2(date.getMinutes());
+  const ss = pad2(date.getSeconds());
+  return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+}
+
+function formatRelative(date: Date, baseMs = Date.now()): string {
+  const diffMs = baseMs - date.getTime();
+  const abs = Math.abs(diffMs);
+  const sec = Math.floor(abs / 1000);
+  const min = Math.floor(sec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+  if (day > 0) return diffMs >= 0 ? `${day}d ago` : `in ${day}d`;
+  if (hr > 0) return diffMs >= 0 ? `${hr}h ago` : `in ${hr}h`;
+  if (min > 0) return diffMs >= 0 ? `${min}m ago` : `in ${min}m`;
+  return diffMs >= 0 ? `${sec}s ago` : `in ${sec}s`;
+}
+
+function formatDuration(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(totalSec / 86400);
+  const hours = Math.floor((totalSec % 86400) / 3600);
+  const minutes = Math.floor((totalSec % 3600) / 60);
+  const seconds = totalSec % 60;
+  if (days) return `${days}d ${hours}h`;
+  if (hours) return `${hours}h ${minutes}m`;
+  if (minutes) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}
+
 const EventsTable: React.FC<EventsTableProps> = ({ eventsPage, selectedEvent, onSelectEvent, typeLabelMap }) => {
   const rows = useMemo(() => eventsPage?.data ?? [], [eventsPage]);
 
@@ -51,8 +97,45 @@ const EventsTable: React.FC<EventsTableProps> = ({ eventsPage, selectedEvent, on
                 <span className="text-sm">#{evt.type}</span>
               )}
             </TableCell>
-            <TableCell>{evt.startTime ?? '-'}</TableCell>
-            <TableCell>{evt.endTime ?? '-'}</TableCell>
+            {/* Start time (formatted + relative) */}
+            <TableCell title={evt.startTime ?? ''}>
+              {(() => {
+                const startDt = parseDate(evt.startTime);
+                if (!startDt) return '-';
+                return (
+                  <div className="flex flex-col">
+                    <span className="font-mono text-sm">{formatTimestamp(startDt)}</span>
+                    <span className="text-xs text-gray-500">{formatRelative(startDt)}</span>
+                  </div>
+                );
+              })()}
+            </TableCell>
+            {/* End time (formatted + duration or progress) */}
+            <TableCell title={evt.endTime ?? ''}>
+              {(() => {
+                const startDt = parseDate(evt.startTime);
+                const endDt = parseDate(evt.endTime);
+                if (endDt) {
+                  const dur = startDt ? endDt.getTime() - startDt.getTime() : undefined;
+                  return (
+                    <div className="flex flex-col">
+                      <span className="font-mono text-sm">{formatTimestamp(endDt)}</span>
+                      <span className="text-xs text-gray-500">{dur !== undefined ? `Duration: ${formatDuration(dur)}` : formatRelative(endDt)}</span>
+                    </div>
+                  );
+                }
+                if (startDt && !evt.isFinished) {
+                  const elapsed = Date.now() - startDt.getTime();
+                  return (
+                    <div className="flex flex-col">
+                      <span className="text-sm text-gray-700">In progress</span>
+                      <span className="text-xs text-gray-500">+{formatDuration(elapsed)}</span>
+                    </div>
+                  );
+                }
+                return '-';
+              })()}
+            </TableCell>
             <TableCell>{evt.createdAt}</TableCell>
             <TableCell>
               <Button variant="outline" size="sm" onClick={() => onSelectEvent(evt)}>View Details</Button>
