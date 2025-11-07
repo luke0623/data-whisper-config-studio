@@ -57,7 +57,7 @@ const EventDetailsPanel: React.FC<EventDetailsPanelProps> = ({ selectedEvent, re
                     <TableCell>{r.jsonCount ?? 0}</TableCell>
                     <TableCell>{r.jsonFinishedCount ?? 0}</TableCell>
                     <TableCell>#{r.status ?? 0}</TableCell>
-                    <TableCell>{typeof r.percent === 'number' ? `${Math.round(r.percent * 100) / 100}%` : '-'}</TableCell>
+                    <TableCell>{typeof r.percent === 'number' ? `${Math.round(r.percent * 100) }%` : '-'}</TableCell>
                     <TableCell>{r.errors ?? 0}</TableCell>
                   </TableRow>
                 ))}

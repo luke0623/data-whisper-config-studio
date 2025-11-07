@@ -48,20 +48,20 @@ const Config = () => {
       <Separator />
 
       {/* Main grid layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Main configuration card */}
         <Card className="lg:col-span-2 border border-gray-200 shadow-lg rounded-2xl bg-white">
-          <CardHeader className="pb-0">
+          {/* <CardHeader className="pb-0">
             <CardTitle className="text-gray-900">Configuration Wizard</CardTitle>
             <CardDescription>Follow the steps to set up and test your configuration</CardDescription>
-          </CardHeader>
+          </CardHeader> */}
           <CardContent className="p-6">
             <ConfigurationForm />
           </CardContent>
         </Card>
 
         {/* Sidebar with tips and help */}
-        <div className="space-y-6 lg:sticky lg:top-20">
+        {/* <div className="space-y-6 lg:sticky lg:top-20">
           <Card className="border border-gray-200 rounded-2xl shadow-sm">
             <CardHeader>
               <CardTitle className="text-gray-900 flex items-center gap-2">
@@ -83,7 +83,7 @@ const Config = () => {
           </Card>
 
           
-        </div>
+        </div> */}
       </div>
     </div>
   );
